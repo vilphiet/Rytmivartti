@@ -27,7 +27,7 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1 className="app-title">Polyrytmi</h1>
+        <h1 className="app-title">Rytmivartti</h1>
         <PresetTabs
           presets={presets}
           activeLabel={activePresetLabel}

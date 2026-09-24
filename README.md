@@ -1,4 +1,4 @@
-# Polyrytmi
+# Rytmivartti
 
 Polyrytmien visualisointi- ja soittosovellus. Yksi jaettu ympyrä, jonka
 kehälle piirretään säännöllinen monikulmio per rytmikerros (N kärkeä =
