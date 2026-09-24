@@ -1,7 +1,14 @@
 import { useState } from 'react';
-import type { RhythmLayer, Waveform } from '../audio/types';
+import type { RhythmLayer, VoiceId, Waveform } from '../audio/types';
 
 const WAVEFORM_OPTIONS: Waveform[] = ['sine', 'triangle', 'square', 'sawtooth'];
+const VOICE_OPTIONS: { id: VoiceId; label: string }[] = [
+  { id: 'tone', label: 'Ääni' },
+  { id: 'kick', label: 'Kick' },
+  { id: 'snare', label: 'Snare' },
+  { id: 'hihat', label: 'Hi-hat' },
+  { id: 'rim', label: 'Rim' },
+];
 
 interface ClampedNumberFieldProps {
   value: number;
@@ -83,28 +90,46 @@ export function LayerPanel({ layers, onUpdate, onRemove, onAdd }: Props) {
             </label>
 
             <label className="layer-field">
-              <span>Aaltomuoto</span>
+              <span>Ääni</span>
               <select
-                value={layer.waveform}
-                onChange={(e) => onUpdate(layer.id, { waveform: e.target.value as Waveform })}
+                value={layer.voiceId}
+                onChange={(e) => onUpdate(layer.id, { voiceId: e.target.value as VoiceId })}
               >
-                {WAVEFORM_OPTIONS.map((w) => (
-                  <option key={w} value={w}>
-                    {w}
+                {VOICE_OPTIONS.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label}
                   </option>
                 ))}
               </select>
             </label>
 
-            <label className="layer-field layer-freq">
-              <span>Hz</span>
-              <ClampedNumberField
-                value={Math.round(layer.frequency)}
-                min={20}
-                max={2000}
-                onCommit={(frequency) => onUpdate(layer.id, { frequency })}
-              />
-            </label>
+            {layer.voiceId === 'tone' && (
+              <label className="layer-field">
+                <span>Aaltomuoto</span>
+                <select
+                  value={layer.waveform}
+                  onChange={(e) => onUpdate(layer.id, { waveform: e.target.value as Waveform })}
+                >
+                  {WAVEFORM_OPTIONS.map((w) => (
+                    <option key={w} value={w}>
+                      {w}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            {layer.voiceId === 'tone' && (
+              <label className="layer-field layer-freq">
+                <span>Hz</span>
+                <ClampedNumberField
+                  value={Math.round(layer.frequency)}
+                  min={20}
+                  max={2000}
+                  onCommit={(frequency) => onUpdate(layer.id, { frequency })}
+                />
+              </label>
+            )}
 
             <label className="layer-field layer-volume">
               <span>Vol</span>
@@ -118,6 +143,18 @@ export function LayerPanel({ layers, onUpdate, onRemove, onAdd }: Props) {
               />
             </label>
 
+            <label className="layer-field layer-pan">
+              <span>Pan</span>
+              <input
+                type="range"
+                min={-1}
+                max={1}
+                step={0.01}
+                value={layer.pan}
+                onChange={(e) => onUpdate(layer.id, { pan: Number(e.target.value) })}
+              />
+            </label>
+
             <button
               type="button"
               className={`icon-btn${layer.muted ? ' active' : ''}`}
@@ -125,6 +162,15 @@ export function LayerPanel({ layers, onUpdate, onRemove, onAdd }: Props) {
               onClick={() => onUpdate(layer.id, { muted: !layer.muted })}
             >
               {layer.muted ? 'Mykistetty' : 'Mykistä'}
+            </button>
+
+            <button
+              type="button"
+              className={`icon-btn${layer.solo ? ' active' : ''}`}
+              title={layer.solo ? 'Poista solo' : 'Solo'}
+              onClick={() => onUpdate(layer.id, { solo: !layer.solo })}
+            >
+              Solo
             </button>
 
             <button

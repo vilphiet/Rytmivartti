@@ -1,12 +1,30 @@
-import type { BeatEvent, RhythmLayer } from './types';
+import type { BeatEvent, RhythmLayer, VoiceId } from './types';
+import type { Voice } from './voices/Voice';
+import { ToneVoice } from './voices/ToneVoice';
+import { KickVoice, SnareVoice, HihatVoice, RimVoice } from './voices/DrumVoices';
+import { SampleVoice } from './voices/SampleVoice';
+import { getSharedNoiseBuffer } from './noiseBuffer';
 
 const SCHEDULE_AHEAD_TIME = 0.12;
 const LOOKAHEAD_INTERVAL_MS = 25;
 const START_LEAD = 0.08;
 const ACCENT_EPSILON = 0.004;
+const ACCENT_BOOST_FACTOR = 1.3;
+const MIX_RAMP_TIME = 0.01;
+const DEFAULT_TRIGGER_VELOCITY = 0.6;
+
+const COMPRESSOR_THRESHOLD = -6;
+const COMPRESSOR_RATIO = 4;
+const COMPRESSOR_ATTACK = 0.003;
+const COMPRESSOR_RELEASE = 0.1;
 
 interface LayerRuntime {
   nextIndex: number;
+}
+
+interface LayerMixerNodes {
+  gain: GainNode;
+  pan: StereoPannerNode;
 }
 
 /**
@@ -18,9 +36,12 @@ interface LayerRuntime {
 export class AudioEngine {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
+  private compressor: DynamicsCompressorNode | null = null;
   private timerId: number | null = null;
   private layers: RhythmLayer[] = [];
   private runtime = new Map<string, LayerRuntime>();
+  private voices = new Map<string, Voice>();
+  private layerMixers = new Map<string, LayerMixerNodes>();
 
   private baseStartTime = 0;
   private cycleDuration = 1;
@@ -37,9 +58,17 @@ export class AudioEngine {
   private ensureContext(): AudioContext {
     if (!this.ctx) {
       this.ctx = new AudioContext();
+
+      this.compressor = this.ctx.createDynamicsCompressor();
+      this.compressor.threshold.value = COMPRESSOR_THRESHOLD;
+      this.compressor.ratio.value = COMPRESSOR_RATIO;
+      this.compressor.attack.value = COMPRESSOR_ATTACK;
+      this.compressor.release.value = COMPRESSOR_RELEASE;
+      this.compressor.connect(this.ctx.destination);
+
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = 0.9;
-      this.masterGain.connect(this.ctx.destination);
+      this.masterGain.connect(this.compressor);
     }
     return this.ctx;
   }
@@ -60,20 +89,56 @@ export class AudioEngine {
   setLayers(layers: RhythmLayer[]) {
     const prevLayers = this.layers;
     this.layers = layers;
+
     for (const layer of layers) {
-      const existing = this.runtime.get(layer.id);
       const prev = prevLayers.find((l) => l.id === layer.id);
-      if (!existing) {
+
+      const existingRuntime = this.runtime.get(layer.id);
+      if (!existingRuntime) {
         this.runtime.set(layer.id, {
           nextIndex: this.playing ? this.computeNextIndex(layer) : 0,
         });
       } else if (this.playing && prev && prev.n !== layer.n) {
         this.runtime.set(layer.id, { nextIndex: this.computeNextIndex(layer) });
       }
+
+      const needsNewVoice =
+        !this.voices.has(layer.id) ||
+        !prev ||
+        prev.voiceId !== layer.voiceId ||
+        prev.waveform !== layer.waveform ||
+        prev.frequency !== layer.frequency;
+      if (needsNewVoice) {
+        this.voices.set(layer.id, this.createVoice(layer));
+      }
+
+      if (!this.layerMixers.has(layer.id)) {
+        const ctx = this.ensureContext();
+        const gain = ctx.createGain();
+        const pan = ctx.createStereoPanner();
+        gain.gain.value = 0;
+        pan.pan.value = layer.pan;
+        gain.connect(pan);
+        pan.connect(this.masterGain!);
+        this.layerMixers.set(layer.id, { gain, pan });
+      }
     }
+
     for (const id of Array.from(this.runtime.keys())) {
       if (!layers.some((l) => l.id === id)) this.runtime.delete(id);
     }
+    for (const id of Array.from(this.voices.keys())) {
+      if (!layers.some((l) => l.id === id)) this.voices.delete(id);
+    }
+    for (const [id, nodes] of Array.from(this.layerMixers.entries())) {
+      if (!layers.some((l) => l.id === id)) {
+        nodes.gain.disconnect();
+        nodes.pan.disconnect();
+        this.layerMixers.delete(id);
+      }
+    }
+
+    this.applyMixTargets();
   }
 
   /** Change the shared cycle length without discontinuity: the current
@@ -149,9 +214,57 @@ export class AudioEngine {
     if (this.timerId !== null) window.clearInterval(this.timerId);
     this.timerId = null;
     this.beatListeners.clear();
+    for (const nodes of this.layerMixers.values()) {
+      nodes.gain.disconnect();
+      nodes.pan.disconnect();
+    }
+    this.layerMixers.clear();
+    this.voices.clear();
     this.masterGain?.disconnect();
+    this.compressor?.disconnect();
     void this.ctx?.close();
     this.ctx = null;
+  }
+
+  private createVoice(layer: RhythmLayer): Voice {
+    const voiceId: VoiceId = layer.voiceId;
+    switch (voiceId) {
+      case 'kick':
+        return new KickVoice();
+      case 'snare':
+        return new SnareVoice(this.getNoiseBuffer());
+      case 'hihat':
+        return new HihatVoice(this.getNoiseBuffer());
+      case 'rim':
+        return new RimVoice(this.getNoiseBuffer());
+      case 'sample':
+        return new SampleVoice(null);
+      case 'tone':
+        return new ToneVoice(layer.waveform, layer.frequency);
+    }
+  }
+
+  private getNoiseBuffer(): AudioBuffer {
+    return getSharedNoiseBuffer(this.ensureContext());
+  }
+
+  /** Recomputes every layer's mixer target (mute/solo/volume/pan). Solo is
+   * global — one layer's solo state affects every other layer's target —
+   * so this always re-applies to the whole layer set, not just the one
+   * that changed. Uses setTargetAtTime so changes ramp smoothly instead of
+   * clicking, and never touch the scheduling loop. */
+  private applyMixTargets() {
+    const ctx = this.ensureContext();
+    const now = ctx.currentTime;
+    const anySolo = this.layers.some((l) => l.solo);
+    for (const layer of this.layers) {
+      const nodes = this.layerMixers.get(layer.id);
+      if (!nodes) continue;
+      const audible = !layer.muted && (!anySolo || layer.solo);
+      const targetGain = audible ? layer.volume : 0;
+      nodes.gain.gain.setTargetAtTime(targetGain, now, MIX_RAMP_TIME);
+      nodes.pan.pan.setTargetAtTime(layer.pan, now, MIX_RAMP_TIME);
+    }
   }
 
   private computeNextIndex(layer: RhythmLayer): number {
@@ -193,8 +306,9 @@ export class AudioEngine {
           break;
         }
       }
-      this.triggerSound(layer, time, isAccent);
-      events.push({ layerId: layer.id, time, vertexIndex: idx % layer.n, isAccent });
+      const velocity = DEFAULT_TRIGGER_VELOCITY;
+      this.triggerVoice(layer, time, velocity, isAccent);
+      events.push({ layerId: layer.id, time, vertexIndex: idx % layer.n, isAccent, velocity });
     }
 
     if (this.beatListeners.size) {
@@ -202,27 +316,11 @@ export class AudioEngine {
     }
   }
 
-  private triggerSound(layer: RhythmLayer, time: number, isAccent: boolean) {
-    if (layer.muted || layer.volume <= 0) return;
-    const ctx = this.ensureContext();
-    const osc = ctx.createOscillator();
-    osc.type = layer.waveform;
-    osc.frequency.setValueAtTime(layer.frequency, time);
-
-    const gain = ctx.createGain();
-    const peak = Math.min(1, layer.volume * (isAccent ? 1.4 : 1));
-    const decay = isAccent ? 0.3 : 0.16;
-    gain.gain.setValueAtTime(0, time);
-    gain.gain.linearRampToValueAtTime(peak, time + 0.004);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + decay);
-
-    osc.connect(gain);
-    gain.connect(this.masterGain!);
-    osc.start(time);
-    osc.stop(time + decay + 0.02);
-    osc.onended = () => {
-      osc.disconnect();
-      gain.disconnect();
-    };
+  private triggerVoice(layer: RhythmLayer, time: number, velocity: number, isAccent: boolean) {
+    const voice = this.voices.get(layer.id);
+    const nodes = this.layerMixers.get(layer.id);
+    if (!voice || !nodes) return;
+    const effectiveVelocity = isAccent ? Math.min(1, velocity * ACCENT_BOOST_FACTOR) : velocity;
+    voice.play(time, effectiveVelocity, nodes.gain);
   }
 }

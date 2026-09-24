@@ -15,10 +15,13 @@ function buildLayer(n: number, index: number): RhythmLayer {
     id: makeLayerId(),
     n,
     color: colorForIndex(index),
+    voiceId: 'tone',
     waveform: waveformForIndex(index),
     frequency: frequencyForIndex(index),
     volume: 0.8,
+    pan: 0,
     muted: false,
+    solo: false,
     hidden: false,
   };
 }

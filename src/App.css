@@ -198,8 +198,8 @@ input[type='range'] {
 }
 
 .layer-row {
-  display: grid;
-  grid-template-columns: auto auto 1fr auto auto auto auto auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   background: #0d1220;
@@ -208,14 +208,6 @@ input[type='range'] {
   border-radius: 10px;
   padding: 10px 12px;
   min-width: 0;
-  overflow-x: auto;
-}
-
-@media (max-width: 640px) {
-  .layer-row {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    row-gap: 8px;
-  }
 }
 
 .layer-color {
@@ -253,7 +245,8 @@ input[type='range'] {
   width: 66px;
 }
 
-.layer-volume {
+.layer-volume,
+.layer-pan {
   min-width: 80px;
 }
 
