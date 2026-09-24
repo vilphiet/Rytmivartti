@@ -4,14 +4,12 @@ import { ToneVoice } from './voices/ToneVoice';
 import { KickVoice, SnareVoice, HihatVoice, RimVoice } from './voices/DrumVoices';
 import { SampleVoice } from './voices/SampleVoice';
 import { getSharedNoiseBuffer } from './noiseBuffer';
+import { ACCENT_EPSILON_SECONDS, applyAccentBoost, detectAccents, stepIndexForBeat, stepIntervalSeconds } from './scheduling';
 
 const SCHEDULE_AHEAD_TIME = 0.12;
 const LOOKAHEAD_INTERVAL_MS = 25;
 const START_LEAD = 0.08;
-const ACCENT_EPSILON = 0.004;
-const ACCENT_BOOST_FACTOR = 1.3;
 const MIX_RAMP_TIME = 0.01;
-const DEFAULT_TRIGGER_VELOCITY = 0.6;
 
 const COMPRESSOR_THRESHOLD = -6;
 const COMPRESSOR_RATIO = 4;
@@ -98,7 +96,7 @@ export class AudioEngine {
         this.runtime.set(layer.id, {
           nextIndex: this.playing ? this.computeNextIndex(layer) : 0,
         });
-      } else if (this.playing && prev && prev.n !== layer.n) {
+      } else if (this.playing && prev && (prev.steps !== layer.steps || prev.cycleBeats !== layer.cycleBeats)) {
         this.runtime.set(layer.id, { nextIndex: this.computeNextIndex(layer) });
       }
 
@@ -269,23 +267,31 @@ export class AudioEngine {
 
   private computeNextIndex(layer: RhythmLayer): number {
     const ctx = this.ensureContext();
-    const interval = this.cycleDuration / layer.n;
+    const interval = stepIntervalSeconds(this.cycleDuration, layer.cycleBeats, layer.steps);
     return Math.max(0, Math.ceil((ctx.currentTime - this.baseStartTime) / interval));
   }
 
   private schedulerTick() {
     const ctx = this.ensureContext();
     const scheduleUntil = ctx.currentTime + SCHEDULE_AHEAD_TIME;
-    const pending: { layer: RhythmLayer; time: number; idx: number }[] = [];
+    const pending: { layer: RhythmLayer; time: number; stepIndex: number; velocity: number }[] = [];
 
     for (const layer of this.layers) {
       const rt = this.runtime.get(layer.id);
       if (!rt) continue;
-      const interval = this.cycleDuration / layer.n;
+      const interval = stepIntervalSeconds(this.cycleDuration, layer.cycleBeats, layer.steps);
       let idx = rt.nextIndex;
       let time = this.baseStartTime + idx * interval;
       while (time < scheduleUntil) {
-        pending.push({ layer, time, idx });
+        const stepIndex = stepIndexForBeat(idx, layer.steps);
+        const velocity = layer.pattern[stepIndex]?.velocity ?? 0;
+        // Steps at velocity 0 are skipped entirely: never scheduled, never
+        // trigger a voice, never emit a BeatEvent (so canvas never flashes
+        // a vertex that didn't actually sound), and never enter accent
+        // coincidence detection below.
+        if (velocity > 0) {
+          pending.push({ layer, time, stepIndex, velocity });
+        }
         idx += 1;
         time = this.baseStartTime + idx * interval;
       }
@@ -295,20 +301,17 @@ export class AudioEngine {
     if (pending.length === 0) return;
     pending.sort((a, b) => a.time - b.time);
 
+    const accentFlags = detectAccents(
+      pending.map((p) => ({ layerId: p.layer.id, time: p.time })),
+      ACCENT_EPSILON_SECONDS,
+    );
+
     const events: BeatEvent[] = [];
     for (let i = 0; i < pending.length; i++) {
-      const { layer, time, idx } = pending[i];
-      let isAccent = false;
-      for (let j = 0; j < pending.length; j++) {
-        if (i === j || pending[j].layer.id === layer.id) continue;
-        if (Math.abs(pending[j].time - time) < ACCENT_EPSILON) {
-          isAccent = true;
-          break;
-        }
-      }
-      const velocity = DEFAULT_TRIGGER_VELOCITY;
+      const { layer, time, stepIndex, velocity } = pending[i];
+      const isAccent = accentFlags[i];
       this.triggerVoice(layer, time, velocity, isAccent);
-      events.push({ layerId: layer.id, time, vertexIndex: idx % layer.n, isAccent, velocity });
+      events.push({ layerId: layer.id, time, vertexIndex: stepIndex, isAccent, velocity });
     }
 
     if (this.beatListeners.size) {
@@ -320,7 +323,6 @@ export class AudioEngine {
     const voice = this.voices.get(layer.id);
     const nodes = this.layerMixers.get(layer.id);
     if (!voice || !nodes) return;
-    const effectiveVelocity = isAccent ? Math.min(1, velocity * ACCENT_BOOST_FACTOR) : velocity;
-    voice.play(time, effectiveVelocity, nodes.gain);
+    voice.play(time, applyAccentBoost(velocity, isAccent), nodes.gain);
   }
 }

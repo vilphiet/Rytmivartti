@@ -16,6 +16,7 @@ function App() {
     toggle,
     reset,
     updateLayer,
+    toggleStep,
     addLayer,
     removeLayer,
     applyPreset,
@@ -35,7 +36,7 @@ function App() {
       </header>
 
       <main className="app-main">
-        <RhythmCanvas engine={engine} layers={layers} />
+        <RhythmCanvas engine={engine} layers={layers} onToggleStep={toggleStep} />
 
         <div className="side-panel">
           <TransportBar

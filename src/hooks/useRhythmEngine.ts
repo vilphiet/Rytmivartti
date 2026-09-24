@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AudioEngine } from '../audio/AudioEngine';
 import type { RhythmLayer } from '../audio/types';
 import { colorForIndex, frequencyForIndex, waveformForIndex } from '../audio/layerDefaults';
+import { cycleStepVelocity, defaultPattern, resizePattern } from '../audio/pattern';
 import { PRESETS } from '../data/presets';
 
 let idCounter = 0;
@@ -10,10 +11,12 @@ function makeLayerId(): string {
   return `layer-${idCounter}`;
 }
 
-function buildLayer(n: number, index: number): RhythmLayer {
+function buildLayer(steps: number, index: number): RhythmLayer {
   return {
     id: makeLayerId(),
-    n,
+    steps,
+    cycleBeats: 1,
+    pattern: defaultPattern(steps),
     color: colorForIndex(index),
     voiceId: 'tone',
     waveform: waveformForIndex(index),
@@ -77,16 +80,37 @@ export function useRhythmEngine() {
 
   const updateLayer = useCallback((id: string, patch: Partial<RhythmLayer>) => {
     setActivePresetLabel(null);
-    setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+    setLayers((prev) =>
+      prev.map((l) => {
+        if (l.id !== id) return l;
+        const updated = { ...l, ...patch };
+        if (patch.steps !== undefined && patch.steps !== l.steps) {
+          updated.pattern = resizePattern(l.pattern, patch.steps);
+        }
+        return updated;
+      }),
+    );
+  }, []);
+
+  const toggleStep = useCallback((id: string, stepIndex: number) => {
+    setLayers((prev) =>
+      prev.map((l) => {
+        if (l.id !== id) return l;
+        const pattern = l.pattern.map((step, i) =>
+          i === stepIndex ? { velocity: cycleStepVelocity(step.velocity) } : step,
+        );
+        return { ...l, pattern };
+      }),
+    );
   }, []);
 
   const addLayer = useCallback(() => {
     setActivePresetLabel(null);
     setLayers((prev) => {
-      const usedNs = new Set(prev.map((l) => l.n));
-      let nextN = (prev.at(-1)?.n ?? 2) + 1;
-      while (usedNs.has(nextN)) nextN += 1;
-      return [...prev, buildLayer(nextN, prev.length)];
+      const usedSteps = new Set(prev.map((l) => l.steps));
+      let nextSteps = (prev.at(-1)?.steps ?? 2) + 1;
+      while (usedSteps.has(nextSteps)) nextSteps += 1;
+      return [...prev, buildLayer(nextSteps, prev.length)];
     });
   }, []);
 
@@ -112,6 +136,7 @@ export function useRhythmEngine() {
     reset,
     toggle,
     updateLayer,
+    toggleStep,
     addLayer,
     removeLayer,
     applyPreset,

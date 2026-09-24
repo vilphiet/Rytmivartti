@@ -2,30 +2,54 @@ import { useEffect, useRef } from 'react';
 import type { AudioEngine } from '../audio/AudioEngine';
 import type { BeatEvent, RhythmLayer } from '../audio/types';
 import { withAlpha } from '../audio/layerDefaults';
+import { STEP_ACCENT } from '../audio/pattern';
 
 const FLASH_DURATION = 0.5;
 const ACCENT_FLASH_DURATION = 0.7;
 const PADDING = 28;
+const HIT_RADIUS = 20;
 
 interface VertexFlash {
   time: number;
   isAccent: boolean;
 }
 
+interface HitTarget {
+  layerId: string;
+  stepIndex: number;
+  x: number;
+  y: number;
+}
+
+type StepVisualState = 'off' | 'normal' | 'accent';
+
+function stepVisualState(velocity: number): StepVisualState {
+  if (velocity <= 0) return 'off';
+  if (velocity >= STEP_ACCENT - 0.001) return 'accent';
+  return 'normal';
+}
+
 interface Props {
   engine: AudioEngine;
   layers: RhythmLayer[];
+  onToggleStep: (layerId: string, stepIndex: number) => void;
 }
 
-export function RhythmCanvas({ engine, layers }: Props) {
+export function RhythmCanvas({ engine, layers, onToggleStep }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const layersRef = useRef(layers);
   useEffect(() => {
     layersRef.current = layers;
   }, [layers]);
 
+  const onToggleStepRef = useRef(onToggleStep);
+  useEffect(() => {
+    onToggleStepRef.current = onToggleStep;
+  }, [onToggleStep]);
+
   const vertexFlashRef = useRef<Map<string, VertexFlash>>(new Map());
   const lastAccentTimeRef = useRef<number>(-Infinity);
+  const hitTargetsRef = useRef<HitTarget[]>([]);
 
   useEffect(() => {
     const unsubscribe = engine.onBeat((events: BeatEvent[]) => {
@@ -68,6 +92,26 @@ export function RhythmCanvas({ engine, layers }: Props) {
     if (canvas.parentElement) ro.observe(canvas.parentElement);
     resize();
 
+    const handlePointerDown = (e: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      let best: { layerId: string; stepIndex: number; distSq: number } | null = null;
+      for (const target of hitTargetsRef.current) {
+        const dx = target.x - x;
+        const dy = target.y - y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq <= HIT_RADIUS * HIT_RADIUS && (!best || distSq < best.distSq)) {
+          best = { layerId: target.layerId, stepIndex: target.stepIndex, distSq };
+        }
+      }
+      if (best) {
+        onToggleStepRef.current(best.layerId, best.stepIndex);
+      }
+    };
+    canvas.addEventListener('pointerdown', handlePointerDown);
+
     const draw = () => {
       raf = requestAnimationFrame(draw);
       const currentLayers = layersRef.current;
@@ -76,6 +120,7 @@ export function RhythmCanvas({ engine, layers }: Props) {
       const cx = size / 2;
       const cy = size / 2;
       const radius = size / 2 - PADDING;
+      const hitTargets: HitTarget[] = [];
 
       ctx2d.clearRect(0, 0, size, size);
 
@@ -107,11 +152,14 @@ export function RhythmCanvas({ engine, layers }: Props) {
 
       for (const layer of currentLayers) {
         if (layer.hidden) continue;
-        const n = Math.max(1, layer.n);
+        const n = Math.max(1, layer.steps);
         const points: [number, number][] = [];
         for (let k = 0; k < n; k++) {
           const a = (k / n) * Math.PI * 2 - Math.PI / 2;
-          points.push([cx + radius * Math.cos(a), cy + radius * Math.sin(a)]);
+          const x = cx + radius * Math.cos(a);
+          const y = cy + radius * Math.sin(a);
+          points.push([x, y]);
+          hitTargets.push({ layerId: layer.id, stepIndex: k, x, y });
         }
 
         ctx2d.beginPath();
@@ -129,27 +177,44 @@ export function RhythmCanvas({ engine, layers }: Props) {
         }
 
         points.forEach(([x, y], k) => {
+          const step = layer.pattern[k];
+          const state = stepVisualState(step ? step.velocity : 0);
+
+          if (state === 'off') {
+            ctx2d.beginPath();
+            ctx2d.arc(x, y, 4, 0, Math.PI * 2);
+            ctx2d.strokeStyle = withAlpha(layer.color, 0.25);
+            ctx2d.lineWidth = 1.5;
+            ctx2d.stroke();
+            return;
+          }
+
           const flash = vertexFlashRef.current.get(`${layer.id}:${k}`);
           let glow = 0;
-          let isAccent = false;
+          let flashIsAccent = false;
           if (flash) {
             const elapsed = now - flash.time;
             const duration = flash.isAccent ? ACCENT_FLASH_DURATION : FLASH_DURATION;
             if (elapsed >= 0 && elapsed < duration) {
               glow = 1 - elapsed / duration;
-              isAccent = flash.isAccent;
+              flashIsAccent = flash.isAccent;
             }
           }
-          const r = 4 + glow * (isAccent ? 9 : 6);
+
+          const baseRadius = state === 'accent' ? 6 : 4;
+          const baseAlpha = state === 'accent' ? 0.85 : 0.65;
+          const r = baseRadius + glow * (flashIsAccent ? 9 : 6);
           ctx2d.beginPath();
           ctx2d.arc(x, y, r, 0, Math.PI * 2);
-          ctx2d.fillStyle = withAlpha(layer.color, layer.muted ? 0.3 : 0.65 + glow * 0.35);
+          ctx2d.fillStyle = withAlpha(layer.color, layer.muted ? 0.3 : Math.min(1, baseAlpha + glow * 0.35));
           ctx2d.shadowColor = layer.color;
-          ctx2d.shadowBlur = 4 + glow * (isAccent ? 24 : 16);
+          ctx2d.shadowBlur = (state === 'accent' ? 6 : 4) + glow * (flashIsAccent ? 24 : 16);
           ctx2d.fill();
           ctx2d.shadowBlur = 0;
         });
       }
+
+      hitTargetsRef.current = hitTargets;
 
       const sweepAngle = phase * Math.PI * 2 - Math.PI / 2;
       const sx = cx + radius * Math.cos(sweepAngle);
@@ -175,6 +240,7 @@ export function RhythmCanvas({ engine, layers }: Props) {
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      canvas.removeEventListener('pointerdown', handlePointerDown);
     };
   }, [engine]);
 

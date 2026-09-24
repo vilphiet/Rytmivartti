@@ -82,10 +82,10 @@ export function LayerPanel({ layers, onUpdate, onRemove, onAdd }: Props) {
             <label className="layer-field layer-n">
               <span>N</span>
               <ClampedNumberField
-                value={layer.n}
+                value={layer.steps}
                 min={1}
                 max={64}
-                onCommit={(n) => onUpdate(layer.id, { n })}
+                onCommit={(steps) => onUpdate(layer.id, { steps })}
               />
             </label>
 
