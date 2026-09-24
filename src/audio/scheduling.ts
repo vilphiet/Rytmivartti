@@ -29,16 +29,28 @@ export function applyAccentBoost(velocity: number, isAccent: boolean): number {
 export interface PendingBeat {
   layerId: string;
   time: number;
+  /** Whether this layer is actually audible right now (not muted, and —
+   * when some other layer is soloed — itself soloed). Computed by the
+   * caller from current mute/solo state at scheduling time. */
+  audible: boolean;
 }
 
-/** For each entry, true if some OTHER layer has an entry within epsilon of
- * its time. Callers are expected to have already excluded velocity=0
- * (off) steps from `pending`, so coincidence is only ever detected between
- * steps that actually sound. */
+/** For each entry, true if some OTHER *audible* layer has an entry within
+ * epsilon of its time. An inaudible entry is never itself flagged, and
+ * never counts toward flagging another entry — a muted (or non-soloed
+ * while something else is soloed) layer can't make a real coincidence
+ * happen, nor register one for itself. Callers are expected to have
+ * already excluded velocity=0 (off) steps from `pending`, so coincidence
+ * is only ever detected between steps that actually sound. */
 export function detectAccents(pending: PendingBeat[], epsilonSeconds: number): boolean[] {
-  return pending.map((entry, i) =>
-    pending.some(
-      (other, j) => j !== i && other.layerId !== entry.layerId && Math.abs(other.time - entry.time) < epsilonSeconds,
-    ),
-  );
+  return pending.map((entry, i) => {
+    if (!entry.audible) return false;
+    return pending.some(
+      (other, j) =>
+        j !== i &&
+        other.audible &&
+        other.layerId !== entry.layerId &&
+        Math.abs(other.time - entry.time) < epsilonSeconds,
+    );
+  });
 }

@@ -5,11 +5,16 @@ import { KickVoice, SnareVoice, HihatVoice, RimVoice } from './voices/DrumVoices
 import { SampleVoice } from './voices/SampleVoice';
 import { getSharedNoiseBuffer } from './noiseBuffer';
 import { ACCENT_EPSILON_SECONDS, applyAccentBoost, detectAccents, stepIndexForBeat, stepIntervalSeconds } from './scheduling';
+import { STEP_NORMAL } from './pattern';
 
 const SCHEDULE_AHEAD_TIME = 0.12;
 const LOOKAHEAD_INTERVAL_MS = 25;
 const START_LEAD = 0.08;
 const MIX_RAMP_TIME = 0.01;
+// A normal-velocity step (STEP_NORMAL) should reproduce the old, pre-pattern
+// output level exactly. Since voice output now scales with velocity, this
+// makeup gain cancels that scaling back out downstream of every voice.
+const MAKEUP_GAIN = 1 / STEP_NORMAL;
 
 const COMPRESSOR_THRESHOLD = -6;
 const COMPRESSOR_RATIO = 4;
@@ -258,11 +263,18 @@ export class AudioEngine {
     for (const layer of this.layers) {
       const nodes = this.layerMixers.get(layer.id);
       if (!nodes) continue;
-      const audible = !layer.muted && (!anySolo || layer.solo);
-      const targetGain = audible ? layer.volume : 0;
+      const audible = this.isLayerAudible(layer, anySolo);
+      const targetGain = audible ? layer.volume * MAKEUP_GAIN : 0;
       nodes.gain.gain.setTargetAtTime(targetGain, now, MIX_RAMP_TIME);
       nodes.pan.pan.setTargetAtTime(layer.pan, now, MIX_RAMP_TIME);
     }
+  }
+
+  /** Not muted, and — when some other layer is soloed — itself soloed.
+   * Shared by mixer automation and coincidence-accent detection so both
+   * agree on what "actually audible right now" means. */
+  private isLayerAudible(layer: RhythmLayer, anySolo: boolean): boolean {
+    return !layer.muted && (!anySolo || layer.solo);
   }
 
   private computeNextIndex(layer: RhythmLayer): number {
@@ -301,8 +313,13 @@ export class AudioEngine {
     if (pending.length === 0) return;
     pending.sort((a, b) => a.time - b.time);
 
+    const anySolo = this.layers.some((l) => l.solo);
     const accentFlags = detectAccents(
-      pending.map((p) => ({ layerId: p.layer.id, time: p.time })),
+      pending.map((p) => ({
+        layerId: p.layer.id,
+        time: p.time,
+        audible: this.isLayerAudible(p.layer, anySolo),
+      })),
       ACCENT_EPSILON_SECONDS,
     );
 

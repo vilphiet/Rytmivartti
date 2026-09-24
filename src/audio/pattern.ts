@@ -1,11 +1,13 @@
 import type { Step } from './types';
 
 export const STEP_OFF = 0;
-export const STEP_NORMAL = 0.6;
+export const STEP_NORMAL = 0.7;
 export const STEP_ACCENT = 1;
 
 /** Builds a pattern of the given length with every step at the default
- * ("normal") velocity — matches today's "every position always plays". */
+ * ("normal") velocity — matches today's "every position always plays".
+ * AudioEngine applies a 1/STEP_NORMAL makeup gain downstream so a normal
+ * step's output level exactly matches the pre-pattern default. */
 export function defaultPattern(length: number): Step[] {
   return Array.from({ length }, () => ({ velocity: STEP_NORMAL }));
 }
