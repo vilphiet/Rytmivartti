@@ -13,6 +13,8 @@ const LAYER_COLORS = [
 
 const WAVEFORMS: Waveform[] = ['sine', 'triangle', 'square', 'sawtooth'];
 
+export const VALID_WAVEFORMS: readonly Waveform[] = WAVEFORMS;
+
 // A minor pentatonic-ish spread so simultaneous layers stay pleasant.
 const FREQUENCIES = [220, 261.63, 329.63, 392, 440, 523.25, 587.33, 659.25];
 

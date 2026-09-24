@@ -4,6 +4,7 @@ import { RhythmCanvas } from './components/RhythmCanvas';
 import { PresetTabs } from './components/PresetTabs';
 import { TransportBar } from './components/TransportBar';
 import { LayerPanel } from './components/LayerPanel';
+import { PatternLibrary } from './components/PatternLibrary';
 
 function App() {
   const {
@@ -22,6 +23,11 @@ function App() {
     applyPreset,
     presets,
     activePresetLabel,
+    restoreDefaults,
+    namedPatternNames,
+    saveCurrentAsNamedPattern,
+    loadNamedPatternByName,
+    deleteNamedPatternByName,
   } = useRhythmEngine();
 
   return (
@@ -48,6 +54,13 @@ function App() {
             onBpmChange={setBpm}
           />
           <LayerPanel layers={layers} onUpdate={updateLayer} onRemove={removeLayer} onAdd={addLayer} />
+          <PatternLibrary
+            namedPatternNames={namedPatternNames}
+            onSave={saveCurrentAsNamedPattern}
+            onLoad={loadNamedPatternByName}
+            onDelete={deleteNamedPatternByName}
+            onRestoreDefaults={restoreDefaults}
+          />
         </div>
       </main>
     </div>

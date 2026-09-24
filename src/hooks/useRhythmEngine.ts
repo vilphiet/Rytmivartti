@@ -4,11 +4,24 @@ import type { RhythmLayer } from '../audio/types';
 import { colorForIndex, frequencyForIndex, waveformForIndex } from '../audio/layerDefaults';
 import { cycleStepVelocity, defaultPattern, resizePattern } from '../audio/pattern';
 import { PRESETS } from '../data/presets';
+import { serializeState } from '../state/serialize';
+import {
+  deleteNamedPattern,
+  listNamedPatterns,
+  loadAppState,
+  loadNamedPattern,
+  saveAppState,
+  saveNamedPattern,
+} from '../state/storage';
 
 let idCounter = 0;
 function makeLayerId(): string {
   idCounter += 1;
-  return `layer-${idCounter}`;
+  // Timestamp component keeps ids unique across page reloads/sessions, not
+  // just within one — otherwise a restored layer named e.g. "layer-1" could
+  // collide with the very next freshly-created layer after reload, since
+  // idCounter always restarts at 0 in a new JS context.
+  return `layer-${Date.now().toString(36)}-${idCounter}`;
 }
 
 function buildLayer(steps: number, index: number): RhythmLayer {
@@ -29,17 +42,28 @@ function buildLayer(steps: number, index: number): RhythmLayer {
   };
 }
 
+function buildDefaultLayers(): RhythmLayer[] {
+  return [buildLayer(4, 0), buildLayer(3, 1)];
+}
+
 const MIN_BPM = 20;
 const MAX_BPM = 220;
 const DEFAULT_BPM = 60;
+const AUTOSAVE_DEBOUNCE_MS = 500;
 
 export function useRhythmEngine() {
   const [engine] = useState(() => new AudioEngine());
 
-  const [layers, setLayers] = useState<RhythmLayer[]>(() => [buildLayer(4, 0), buildLayer(3, 1)]);
-  const [bpm, setBpm] = useState(DEFAULT_BPM);
+  // useState's lazy initializer runs exactly once per mount, unlike
+  // useMemo (which React may drop and recompute) — this must only ever
+  // touch localStorage once, not on every render.
+  const [initialSaved] = useState(() => loadAppState());
+
+  const [layers, setLayers] = useState<RhythmLayer[]>(() => initialSaved?.layers ?? buildDefaultLayers());
+  const [bpm, setBpm] = useState(() => initialSaved?.bpm ?? DEFAULT_BPM);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [activePresetLabel, setActivePresetLabel] = useState<string | null>('4:3');
+  const [activePresetLabel, setActivePresetLabel] = useState<string | null>(initialSaved ? null : '4:3');
+  const [namedPatternNames, setNamedPatternNames] = useState<string[]>(() => listNamedPatterns());
 
   const cycleDuration = 60 / bpm;
 
@@ -54,6 +78,16 @@ export function useRhythmEngine() {
   useEffect(() => {
     return () => engine.dispose();
   }, [engine]);
+
+  // Debounced autosave: current layers+bpm are the whole app's persisted
+  // state. This never touches the AudioEngine/scheduling — it's a plain UI
+  // state save on a regular setTimeout, unrelated to audio timing.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      saveAppState(serializeState(layers, bpm));
+    }, AUTOSAVE_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [layers, bpm]);
 
   const play = useCallback(() => {
     engine.start();
@@ -124,6 +158,43 @@ export function useRhythmEngine() {
     setLayers(values.map((n, i) => buildLayer(n, i)));
   }, []);
 
+  const restoreDefaults = useCallback(() => {
+    engine.reset();
+    setIsPlaying(false);
+    setActivePresetLabel('4:3');
+    setLayers(buildDefaultLayers());
+    setBpm(DEFAULT_BPM);
+  }, [engine]);
+
+  const refreshNamedPatterns = useCallback(() => {
+    setNamedPatternNames(listNamedPatterns());
+  }, []);
+
+  const saveCurrentAsNamedPattern = useCallback(
+    (name: string) => {
+      if (!name.trim()) return;
+      saveNamedPattern(name.trim(), serializeState(layers, bpm));
+      refreshNamedPatterns();
+    },
+    [layers, bpm, refreshNamedPatterns],
+  );
+
+  const loadNamedPatternByName = useCallback((name: string) => {
+    const found = loadNamedPattern(name);
+    if (!found) return;
+    setActivePresetLabel(null);
+    setLayers(found.layers);
+    setBpm(found.bpm);
+  }, []);
+
+  const deleteNamedPatternByName = useCallback(
+    (name: string) => {
+      deleteNamedPattern(name);
+      refreshNamedPatterns();
+    },
+    [refreshNamedPatterns],
+  );
+
   return {
     engine,
     layers,
@@ -142,5 +213,10 @@ export function useRhythmEngine() {
     applyPreset,
     presets: PRESETS,
     activePresetLabel,
+    restoreDefaults,
+    namedPatternNames,
+    saveCurrentAsNamedPattern,
+    loadNamedPatternByName,
+    deleteNamedPatternByName,
   };
 }

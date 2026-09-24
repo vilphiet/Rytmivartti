@@ -280,3 +280,70 @@ input[type='range'] {
   opacity: 0.35;
   cursor: not-allowed;
 }
+
+.pattern-library {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  min-width: 0;
+}
+
+.pattern-library h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pattern-save-row {
+  display: flex;
+  gap: 8px;
+}
+
+.pattern-name-input {
+  flex: 1;
+  min-width: 0;
+  background: #060910;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+
+.pattern-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pattern-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #0d1220;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.pattern-list-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+
+.restore-defaults-btn {
+  align-self: flex-start;
+}
