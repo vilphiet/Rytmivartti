@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { AudioEngine } from '../audio/AudioEngine';
+import type { RhythmEngine } from '../audio/RhythmEngine';
 import type { BeatEvent, RhythmLayer } from '../audio/types';
 import { hexToRgbTriplet } from '../audio/layerDefaults';
 import { stepVisualState } from '../audio/pattern';
@@ -16,7 +16,7 @@ interface CellFlash {
 }
 
 interface Props {
-  engine: AudioEngine;
+  engine: RhythmEngine;
   layers: RhythmLayer[];
   onToggleStep: (layerId: string, stepIndex: number) => void;
   onUpdateLayer: (id: string, patch: Partial<RhythmLayer>) => void;

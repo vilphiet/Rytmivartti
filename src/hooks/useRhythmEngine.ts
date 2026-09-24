@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AudioEngine } from '../audio/AudioEngine';
+import { RhythmEngine } from '../audio/RhythmEngine';
+import type { AudioBus } from '../audio/shared/AudioBus';
 import type { RhythmLayer } from '../audio/types';
 import { colorForIndex, frequencyForIndex, waveformForIndex } from '../audio/layerDefaults';
 import { cycleStepVelocity, defaultPattern, resizePattern } from '../audio/pattern';
@@ -15,6 +16,7 @@ import {
   saveAppState,
   saveNamedPattern,
 } from '../state/storage';
+import { useDebouncedAutosave } from './useDebouncedAutosave';
 
 let idCounter = 0;
 function makeLayerId(): string {
@@ -53,8 +55,8 @@ const MAX_BPM = 220;
 const DEFAULT_BPM = 60;
 const AUTOSAVE_DEBOUNCE_MS = 500;
 
-export function useRhythmEngine() {
-  const [engine] = useState(() => new AudioEngine());
+export function useRhythmEngine(audioBus: AudioBus) {
+  const [engine] = useState(() => new RhythmEngine(audioBus));
 
   // useState's lazy initializer runs exactly once per mount, unlike
   // useMemo (which React may drop and recompute) — this must only ever
@@ -83,14 +85,11 @@ export function useRhythmEngine() {
   }, [engine]);
 
   // Debounced autosave: current layers+bpm are the whole app's persisted
-  // state. This never touches the AudioEngine/scheduling — it's a plain UI
-  // state save on a regular setTimeout, unrelated to audio timing.
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      saveAppState(serializeState(layers, bpm, viewMode));
-    }, AUTOSAVE_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [layers, bpm, viewMode]);
+  // state. This never touches the RhythmEngine/scheduling — it's a plain UI
+  // state save, unrelated to audio timing. Flushes immediately on unmount
+  // (e.g. switching tabs) or when the tab is hidden/closed, so an edit made
+  // right before that is never lost to the debounce timer.
+  useDebouncedAutosave(serializeState(layers, bpm, viewMode), saveAppState, AUTOSAVE_DEBOUNCE_MS);
 
   const play = useCallback(() => {
     engine.start();
