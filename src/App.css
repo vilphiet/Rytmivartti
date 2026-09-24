@@ -54,18 +54,6 @@
   gap: 16px;
 }
 
-.sequencer-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 300px;
-  color: var(--text-dim);
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  grid-column: 1 / -1;
-}
-
 .preset-tabs {
   display: flex;
   gap: 4px;
@@ -535,5 +523,178 @@ input[type='range'] {
 
   .grid-row-steps {
     display: none;
+  }
+}
+
+.seq-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.seq-grid {
+  width: 100%;
+  min-width: 0;
+  background: radial-gradient(circle at center, #0b1220 0%, #060910 100%);
+  border-radius: 24px;
+  border: 1px solid var(--border);
+  padding: 12px;
+}
+
+.seq-grid-scroll {
+  overflow-x: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.seq-row {
+  display: flex;
+  align-items: stretch;
+  border-radius: 10px;
+  background: #0d1220;
+  min-width: min-content;
+}
+
+.seq-row-header {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #0d1220;
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
+  min-width: 96px;
+}
+
+.seq-row-name {
+  flex: 1;
+  min-width: 44px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  padding: 0;
+  cursor: pointer;
+}
+
+.seq-row-header .icon-btn {
+  padding: 4px 8px;
+  font-size: 0.7rem;
+}
+
+.seq-row-cells {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 6px;
+  gap: 3px;
+}
+
+.seq-cell {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  min-height: 40px;
+  align-self: stretch;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  touch-action: manipulation;
+}
+
+.seq-cell-group-start {
+  margin-left: 6px;
+}
+
+.seq-cell-off {
+  opacity: 0.35;
+}
+
+.seq-cell-normal {
+  opacity: 0.85;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.seq-cell-accent {
+  opacity: 1;
+  border-width: 2.5px;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.seq-playhead {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.seq-track-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.seq-track-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.seq-track-settings-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.seq-bpm-number input {
+  width: 64px;
+}
+
+.seq-pattern-length {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.seq-pattern-length-options {
+  display: flex;
+  gap: 6px;
+}
+
+@media (max-width: 640px) {
+  .seq-row-header {
+    min-width: 76px;
+    padding: 6px 8px;
+  }
+
+  .seq-row-name {
+    font-size: 0.78rem;
   }
 }
