@@ -26,3 +26,15 @@ export function cycleStepVelocity(velocity: number): number {
   if (velocity === STEP_NORMAL) return STEP_ACCENT;
   return STEP_OFF;
 }
+
+export type StepVisualState = 'off' | 'normal' | 'accent';
+
+/** Classifies a step's velocity into the 3 visual states shared by both
+ * the circle and grid views. Uses thresholds (not exact equality) so any
+ * 0..1 velocity a preset or saved pattern might carry still classifies
+ * sensibly, not just the 3 values the edit cycle itself produces. */
+export function stepVisualState(velocity: number): StepVisualState {
+  if (velocity <= STEP_OFF) return 'off';
+  if (velocity >= STEP_ACCENT - 0.001) return 'accent';
+  return 'normal';
+}

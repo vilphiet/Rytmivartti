@@ -5,6 +5,8 @@ import { colorForIndex, frequencyForIndex, waveformForIndex } from '../audio/lay
 import { cycleStepVelocity, defaultPattern, resizePattern } from '../audio/pattern';
 import { PRESETS } from '../data/presets';
 import { serializeState } from '../state/serialize';
+import type { ViewMode } from '../state/schema';
+import { DEFAULT_VIEW_MODE } from '../state/schema';
 import {
   deleteNamedPattern,
   listNamedPatterns,
@@ -61,6 +63,7 @@ export function useRhythmEngine() {
 
   const [layers, setLayers] = useState<RhythmLayer[]>(() => initialSaved?.layers ?? buildDefaultLayers());
   const [bpm, setBpm] = useState(() => initialSaved?.bpm ?? DEFAULT_BPM);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => initialSaved?.viewMode ?? DEFAULT_VIEW_MODE);
   const [isPlaying, setIsPlaying] = useState(false);
   const [activePresetLabel, setActivePresetLabel] = useState<string | null>(initialSaved ? null : '4:3');
   const [namedPatternNames, setNamedPatternNames] = useState<string[]>(() => listNamedPatterns());
@@ -84,10 +87,10 @@ export function useRhythmEngine() {
   // state save on a regular setTimeout, unrelated to audio timing.
   useEffect(() => {
     const timer = setTimeout(() => {
-      saveAppState(serializeState(layers, bpm));
+      saveAppState(serializeState(layers, bpm, viewMode));
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [layers, bpm]);
+  }, [layers, bpm, viewMode]);
 
   const play = useCallback(() => {
     engine.start();
@@ -164,6 +167,7 @@ export function useRhythmEngine() {
     setActivePresetLabel('4:3');
     setLayers(buildDefaultLayers());
     setBpm(DEFAULT_BPM);
+    setViewMode(DEFAULT_VIEW_MODE);
   }, [engine]);
 
   const refreshNamedPatterns = useCallback(() => {
@@ -173,10 +177,10 @@ export function useRhythmEngine() {
   const saveCurrentAsNamedPattern = useCallback(
     (name: string) => {
       if (!name.trim()) return;
-      saveNamedPattern(name.trim(), serializeState(layers, bpm));
+      saveNamedPattern(name.trim(), serializeState(layers, bpm, viewMode));
       refreshNamedPatterns();
     },
-    [layers, bpm, refreshNamedPatterns],
+    [layers, bpm, viewMode, refreshNamedPatterns],
   );
 
   const loadNamedPatternByName = useCallback((name: string) => {
@@ -185,6 +189,7 @@ export function useRhythmEngine() {
     setActivePresetLabel(null);
     setLayers(found.layers);
     setBpm(found.bpm);
+    setViewMode(found.viewMode);
   }, []);
 
   const deleteNamedPatternByName = useCallback(
@@ -201,6 +206,8 @@ export function useRhythmEngine() {
     bpm,
     setBpm: (value: number) => setBpm(Math.min(MAX_BPM, Math.max(MIN_BPM, value))),
     bpmRange: { min: MIN_BPM, max: MAX_BPM },
+    viewMode,
+    setViewMode,
     isPlaying,
     play,
     pause,

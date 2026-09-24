@@ -1,10 +1,11 @@
 import type { RhythmLayer, Step, VoiceId, Waveform } from '../audio/types';
 import { colorForIndex, frequencyForIndex, VALID_WAVEFORMS, waveformForIndex } from '../audio/layerDefaults';
 import { defaultPattern, resizePattern, STEP_ACCENT, STEP_NORMAL, STEP_OFF } from '../audio/pattern';
-import type { PersistedState } from './schema';
-import { CURRENT_SCHEMA_VERSION } from './schema';
+import type { PersistedState, ViewMode } from './schema';
+import { CURRENT_SCHEMA_VERSION, DEFAULT_VIEW_MODE } from './schema';
 
 const VALID_VOICE_IDS: readonly VoiceId[] = ['tone', 'kick', 'snare', 'hihat', 'rim', 'sample'];
+const VALID_VIEW_MODES: readonly ViewMode[] = ['grid', 'circle'];
 const DEFAULT_BPM = 60;
 
 function isFiniteNumber(v: unknown): v is number {
@@ -69,8 +70,8 @@ export function normalizeLayers(raw: unknown): RhythmLayer[] {
   return raw.map((l, i) => normalizeLayer(l, i));
 }
 
-export function serializeState(layers: RhythmLayer[], bpm: number): PersistedState {
-  return { schemaVersion: CURRENT_SCHEMA_VERSION, layers, bpm };
+export function serializeState(layers: RhythmLayer[], bpm: number, viewMode: ViewMode = DEFAULT_VIEW_MODE): PersistedState {
+  return { schemaVersion: CURRENT_SCHEMA_VERSION, layers, bpm, viewMode };
 }
 
 /** Parses and validates a persisted-state JSON string. Returns null for
@@ -87,7 +88,8 @@ export function parseAppState(raw: string | null): PersistedState | null {
     if (layers.length === 0) return null;
 
     const bpm = isFiniteNumber(d.bpm) ? d.bpm : DEFAULT_BPM;
-    return { schemaVersion: CURRENT_SCHEMA_VERSION, layers, bpm };
+    const viewMode = VALID_VIEW_MODES.includes(d.viewMode as ViewMode) ? (d.viewMode as ViewMode) : DEFAULT_VIEW_MODE;
+    return { schemaVersion: CURRENT_SCHEMA_VERSION, layers, bpm, viewMode };
   } catch {
     return null;
   }

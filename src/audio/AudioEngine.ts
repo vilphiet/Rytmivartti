@@ -6,6 +6,7 @@ import { SampleVoice } from './voices/SampleVoice';
 import { getSharedNoiseBuffer } from './noiseBuffer';
 import { ACCENT_EPSILON_SECONDS, applyAccentBoost, detectAccents, stepIndexForBeat, stepIntervalSeconds } from './scheduling';
 import { STEP_NORMAL } from './pattern';
+import { compensateForOutputLatency } from './rowPhase';
 
 const SCHEDULE_AHEAD_TIME = 0.12;
 const LOOKAHEAD_INTERVAL_MS = 25;
@@ -51,6 +52,12 @@ export class AudioEngine {
   private playing = false;
   private hasStarted = false;
   private frozenPhase = 0;
+  /** ctx.currentTime snapshot taken at the last pause(); meaningless while
+   * playing. Lets getReferenceTime() derive phase for ANY duration (not
+   * just the shared cycleDuration) while paused — frozenPhase alone can't,
+   * since it already discarded which multiple of cycleDuration had
+   * elapsed, information other durations need. */
+  private pausedAtCtxTime = 0;
 
   private beatListeners = new Set<(events: BeatEvent[]) => void>();
 
@@ -87,6 +94,31 @@ export class AudioEngine {
     if (!ctx) return 0;
     const raw = (ctx.currentTime - this.baseStartTime) / this.cycleDuration;
     return ((raw % 1) + 1) % 1;
+  }
+
+  /** The shared phase-0 reference instant, for callers computing phase
+   * against a different duration than the shared cycle (e.g. a grid row
+   * with its own cycleBeats). Read-only — never touches scheduling. */
+  getBaseStartTime(): number {
+    return this.baseStartTime;
+  }
+
+  /** The current shared beat duration in seconds, for callers computing a
+   * per-row cycle length as cycleDuration * layer.cycleBeats. */
+  getCycleDuration(): number {
+    return this.cycleDuration;
+  }
+
+  /** "Now", for phase math: live audio time while playing (compensated for
+   * output latency when the browser reports one, so a visual indicator
+   * matches what's actually audible rather than what was just scheduled —
+   * this can drift noticeably apart on e.g. Bluetooth headphones), or the
+   * frozen instant of the last pause() otherwise. */
+  getReferenceTime(): number {
+    const ctx = this.ctx;
+    if (!ctx) return 0;
+    if (!this.playing) return this.pausedAtCtxTime;
+    return compensateForOutputLatency(ctx.currentTime, ctx.outputLatency);
   }
 
   setLayers(layers: RhythmLayer[]) {
@@ -185,6 +217,7 @@ export class AudioEngine {
   pause() {
     if (!this.playing) return;
     const ctx = this.ensureContext();
+    this.pausedAtCtxTime = ctx.currentTime;
     const raw = (ctx.currentTime - this.baseStartTime) / this.cycleDuration;
     this.frozenPhase = ((raw % 1) + 1) % 1;
     this.playing = false;
@@ -202,6 +235,7 @@ export class AudioEngine {
     this.playing = false;
     this.hasStarted = false;
     this.frozenPhase = 0;
+    this.pausedAtCtxTime = 0;
     this.baseStartTime = 0;
     for (const layer of this.layers) {
       this.runtime.set(layer.id, { nextIndex: 0 });

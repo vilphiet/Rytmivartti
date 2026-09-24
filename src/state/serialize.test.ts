@@ -155,4 +155,24 @@ describe('normalization of missing/invalid fields', () => {
     expect(typeof id).toBe('string');
     expect(id.length).toBeGreaterThan(0);
   });
+
+  it('defaults viewMode to grid when the field is entirely missing (data saved before this field existed)', () => {
+    const json = JSON.stringify({ schemaVersion: CURRENT_SCHEMA_VERSION, layers: [makeLayer()], bpm: 60 });
+    expect(parseAppState(json)!.viewMode).toBe('grid');
+  });
+
+  it('defaults viewMode to grid for an invalid value instead of rejecting the whole state', () => {
+    const json = JSON.stringify({
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      layers: [makeLayer()],
+      bpm: 60,
+      viewMode: 'not-a-real-view',
+    });
+    expect(parseAppState(json)!.viewMode).toBe('grid');
+  });
+
+  it('round-trips an explicit circle viewMode', () => {
+    const original = serializeState([makeLayer()], 60, 'circle');
+    expect(parseAppState(JSON.stringify(original))!.viewMode).toBe('circle');
+  });
 });

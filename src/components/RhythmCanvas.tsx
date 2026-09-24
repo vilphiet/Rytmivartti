@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { AudioEngine } from '../audio/AudioEngine';
 import type { BeatEvent, RhythmLayer } from '../audio/types';
 import { withAlpha } from '../audio/layerDefaults';
-import { STEP_ACCENT } from '../audio/pattern';
+import { stepVisualState } from '../audio/pattern';
 
 const FLASH_DURATION = 0.5;
 const ACCENT_FLASH_DURATION = 0.7;
@@ -19,14 +19,6 @@ interface HitTarget {
   stepIndex: number;
   x: number;
   y: number;
-}
-
-type StepVisualState = 'off' | 'normal' | 'accent';
-
-function stepVisualState(velocity: number): StepVisualState {
-  if (velocity <= 0) return 'off';
-  if (velocity >= STEP_ACCENT - 0.001) return 'accent';
-  return 'normal';
 }
 
 interface Props {

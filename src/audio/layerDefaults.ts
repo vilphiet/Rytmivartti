@@ -37,3 +37,13 @@ export function withAlpha(hexColor: string, alpha: number): string {
   const b = parseInt(hex.substring(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
+
+/** "r, g, b" triplet for embedding in a CSS custom property, e.g. for
+ * `rgba(var(--cell-color-rgb), var(--glow-opacity))`. */
+export function hexToRgbTriplet(hexColor: string): string {
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  return `${r}, ${g}, ${b}`;
+}
