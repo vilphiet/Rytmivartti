@@ -23,6 +23,49 @@
   margin: 0;
 }
 
+.tab-bar {
+  display: flex;
+  gap: 6px;
+}
+
+.tab-bar-btn {
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.tab-bar-btn:hover {
+  color: var(--text);
+}
+
+.tab-bar-btn.active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--bg-panel);
+}
+
+.tab-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sequencer-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  color: var(--text-dim);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  grid-column: 1 / -1;
+}
+
 .preset-tabs {
   display: flex;
   gap: 4px;

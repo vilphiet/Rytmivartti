@@ -1,9 +1,9 @@
-import type { BeatEvent, RhythmLayer, VoiceId } from './types';
+import type { BeatEvent, RhythmLayer } from './types';
 import type { Voice } from './voices/Voice';
-import { ToneVoice } from './voices/ToneVoice';
-import { KickVoice, SnareVoice, HihatVoice, RimVoice } from './voices/DrumVoices';
-import { SampleVoice } from './voices/SampleVoice';
-import { getSharedNoiseBuffer } from './noiseBuffer';
+import type { AudioBus } from './shared/AudioBus';
+import { createVoice } from './shared/createVoice';
+import { applyTrackMixTarget, createTrackMixer, disposeTrackMixer, isTrackAudible } from './shared/trackMixer';
+import type { TrackMixerNodes } from './shared/trackMixer';
 import { ACCENT_EPSILON_SECONDS, applyAccentBoost, detectAccents, stepIndexForBeat, stepIntervalSeconds } from './scheduling';
 import { STEP_NORMAL } from './pattern';
 import { compensateForOutputLatency } from './rowPhase';
@@ -17,18 +17,8 @@ const MIX_RAMP_TIME = 0.01;
 // makeup gain cancels that scaling back out downstream of every voice.
 const MAKEUP_GAIN = 1 / STEP_NORMAL;
 
-const COMPRESSOR_THRESHOLD = -6;
-const COMPRESSOR_RATIO = 4;
-const COMPRESSOR_ATTACK = 0.003;
-const COMPRESSOR_RELEASE = 0.1;
-
 interface LayerRuntime {
   nextIndex: number;
-}
-
-interface LayerMixerNodes {
-  gain: GainNode;
-  pan: StereoPannerNode;
 }
 
 /**
@@ -36,16 +26,18 @@ interface LayerMixerNodes {
  * timer periodically schedules oscillator events a short window ahead using
  * AudioContext.currentTime, so audio timing never depends on setTimeout/RAF
  * jitter. Visual code reads getPhase()/getAudioTime() from the same clock.
+ *
+ * Built on the shared AudioBus (one AudioContext/master chain for the whole
+ * app) — this engine owns only its own per-layer voices and mixer nodes,
+ * and dispose() never touches the shared bus, which outlives it.
  */
-export class AudioEngine {
-  private ctx: AudioContext | null = null;
-  private masterGain: GainNode | null = null;
-  private compressor: DynamicsCompressorNode | null = null;
+export class RhythmEngine {
+  private bus: AudioBus;
   private timerId: number | null = null;
   private layers: RhythmLayer[] = [];
   private runtime = new Map<string, LayerRuntime>();
   private voices = new Map<string, Voice>();
-  private layerMixers = new Map<string, LayerMixerNodes>();
+  private layerMixers = new Map<string, TrackMixerNodes>();
 
   private baseStartTime = 0;
   private cycleDuration = 1;
@@ -61,38 +53,23 @@ export class AudioEngine {
 
   private beatListeners = new Set<(events: BeatEvent[]) => void>();
 
+  constructor(bus: AudioBus) {
+    this.bus = bus;
+  }
+
   get isPlaying() {
     return this.playing;
   }
 
-  private ensureContext(): AudioContext {
-    if (!this.ctx) {
-      this.ctx = new AudioContext();
-
-      this.compressor = this.ctx.createDynamicsCompressor();
-      this.compressor.threshold.value = COMPRESSOR_THRESHOLD;
-      this.compressor.ratio.value = COMPRESSOR_RATIO;
-      this.compressor.attack.value = COMPRESSOR_ATTACK;
-      this.compressor.release.value = COMPRESSOR_RELEASE;
-      this.compressor.connect(this.ctx.destination);
-
-      this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = 0.9;
-      this.masterGain.connect(this.compressor);
-    }
-    return this.ctx;
-  }
-
   getAudioTime(): number {
-    return this.ctx ? this.ctx.currentTime : 0;
+    return this.bus.getAudioTime();
   }
 
   /** Fraction 0..1 of the shared base cycle, for canvas rendering. */
   getPhase(): number {
     if (!this.playing) return this.frozenPhase;
-    const ctx = this.ctx;
-    if (!ctx) return 0;
-    const raw = (ctx.currentTime - this.baseStartTime) / this.cycleDuration;
+    const now = this.bus.getAudioTime();
+    const raw = (now - this.baseStartTime) / this.cycleDuration;
     return ((raw % 1) + 1) % 1;
   }
 
@@ -115,9 +92,8 @@ export class AudioEngine {
    * this can drift noticeably apart on e.g. Bluetooth headphones), or the
    * frozen instant of the last pause() otherwise. */
   getReferenceTime(): number {
-    const ctx = this.ctx;
-    if (!ctx) return 0;
     if (!this.playing) return this.pausedAtCtxTime;
+    const ctx = this.bus.ensureContext();
     return compensateForOutputLatency(ctx.currentTime, ctx.outputLatency);
   }
 
@@ -144,18 +120,12 @@ export class AudioEngine {
         prev.waveform !== layer.waveform ||
         prev.frequency !== layer.frequency;
       if (needsNewVoice) {
-        this.voices.set(layer.id, this.createVoice(layer));
+        this.voices.set(layer.id, createVoice(layer.voiceId, layer.waveform, layer.frequency, () => this.bus.getNoiseBuffer()));
       }
 
       if (!this.layerMixers.has(layer.id)) {
-        const ctx = this.ensureContext();
-        const gain = ctx.createGain();
-        const pan = ctx.createStereoPanner();
-        gain.gain.value = 0;
-        pan.pan.value = layer.pan;
-        gain.connect(pan);
-        pan.connect(this.masterGain!);
-        this.layerMixers.set(layer.id, { gain, pan });
+        const ctx = this.bus.ensureContext();
+        this.layerMixers.set(layer.id, createTrackMixer(ctx, this.bus.getMasterDestination(), layer.pan));
       }
     }
 
@@ -167,8 +137,7 @@ export class AudioEngine {
     }
     for (const [id, nodes] of Array.from(this.layerMixers.entries())) {
       if (!layers.some((l) => l.id === id)) {
-        nodes.gain.disconnect();
-        nodes.pan.disconnect();
+        disposeTrackMixer(nodes);
         this.layerMixers.delete(id);
       }
     }
@@ -181,8 +150,7 @@ export class AudioEngine {
   setTempo(cycleDuration: number) {
     if (cycleDuration <= 0) return;
     if (this.playing) {
-      const ctx = this.ensureContext();
-      const now = ctx.currentTime;
+      const now = this.bus.getAudioTime();
       const raw = (now - this.baseStartTime) / this.cycleDuration;
       const normalizedPhase = ((raw % 1) + 1) % 1;
       this.baseStartTime = now - normalizedPhase * cycleDuration;
@@ -196,7 +164,7 @@ export class AudioEngine {
   }
 
   start() {
-    const ctx = this.ensureContext();
+    const ctx = this.bus.ensureContext();
     if (ctx.state === 'suspended') void ctx.resume();
     if (this.playing) return;
 
@@ -216,7 +184,7 @@ export class AudioEngine {
 
   pause() {
     if (!this.playing) return;
-    const ctx = this.ensureContext();
+    const ctx = this.bus.ensureContext();
     this.pausedAtCtxTime = ctx.currentTime;
     const raw = (ctx.currentTime - this.baseStartTime) / this.cycleDuration;
     this.frozenPhase = ((raw % 1) + 1) % 1;
@@ -247,42 +215,19 @@ export class AudioEngine {
     return () => this.beatListeners.delete(cb);
   }
 
+  /** Tears down only this engine's own resources (timer, per-layer voices
+   * and mixer nodes). Never touches the shared AudioBus (context/master
+   * chain), which outlives this engine — e.g. when the polyrhythm tab is
+   * unmounted while the sequencer tab keeps playing. */
   dispose() {
     if (this.timerId !== null) window.clearInterval(this.timerId);
     this.timerId = null;
     this.beatListeners.clear();
     for (const nodes of this.layerMixers.values()) {
-      nodes.gain.disconnect();
-      nodes.pan.disconnect();
+      disposeTrackMixer(nodes);
     }
     this.layerMixers.clear();
     this.voices.clear();
-    this.masterGain?.disconnect();
-    this.compressor?.disconnect();
-    void this.ctx?.close();
-    this.ctx = null;
-  }
-
-  private createVoice(layer: RhythmLayer): Voice {
-    const voiceId: VoiceId = layer.voiceId;
-    switch (voiceId) {
-      case 'kick':
-        return new KickVoice();
-      case 'snare':
-        return new SnareVoice(this.getNoiseBuffer());
-      case 'hihat':
-        return new HihatVoice(this.getNoiseBuffer());
-      case 'rim':
-        return new RimVoice(this.getNoiseBuffer());
-      case 'sample':
-        return new SampleVoice(null);
-      case 'tone':
-        return new ToneVoice(layer.waveform, layer.frequency);
-    }
-  }
-
-  private getNoiseBuffer(): AudioBuffer {
-    return getSharedNoiseBuffer(this.ensureContext());
   }
 
   /** Recomputes every layer's mixer target (mute/solo/volume/pan). Solo is
@@ -291,34 +236,24 @@ export class AudioEngine {
    * that changed. Uses setTargetAtTime so changes ramp smoothly instead of
    * clicking, and never touch the scheduling loop. */
   private applyMixTargets() {
-    const ctx = this.ensureContext();
-    const now = ctx.currentTime;
+    const now = this.bus.getAudioTime();
     const anySolo = this.layers.some((l) => l.solo);
     for (const layer of this.layers) {
       const nodes = this.layerMixers.get(layer.id);
       if (!nodes) continue;
-      const audible = this.isLayerAudible(layer, anySolo);
-      const targetGain = audible ? layer.volume * MAKEUP_GAIN : 0;
-      nodes.gain.gain.setTargetAtTime(targetGain, now, MIX_RAMP_TIME);
-      nodes.pan.pan.setTargetAtTime(layer.pan, now, MIX_RAMP_TIME);
+      const audible = isTrackAudible(layer.muted, layer.solo, anySolo);
+      applyTrackMixTarget(nodes, layer.volume, layer.pan, audible, MAKEUP_GAIN, now, MIX_RAMP_TIME);
     }
   }
 
-  /** Not muted, and — when some other layer is soloed — itself soloed.
-   * Shared by mixer automation and coincidence-accent detection so both
-   * agree on what "actually audible right now" means. */
-  private isLayerAudible(layer: RhythmLayer, anySolo: boolean): boolean {
-    return !layer.muted && (!anySolo || layer.solo);
-  }
-
   private computeNextIndex(layer: RhythmLayer): number {
-    const ctx = this.ensureContext();
+    const ctx = this.bus.ensureContext();
     const interval = stepIntervalSeconds(this.cycleDuration, layer.cycleBeats, layer.steps);
     return Math.max(0, Math.ceil((ctx.currentTime - this.baseStartTime) / interval));
   }
 
   private schedulerTick() {
-    const ctx = this.ensureContext();
+    const ctx = this.bus.ensureContext();
     const scheduleUntil = ctx.currentTime + SCHEDULE_AHEAD_TIME;
     const pending: { layer: RhythmLayer; time: number; stepIndex: number; velocity: number }[] = [];
 
@@ -352,7 +287,7 @@ export class AudioEngine {
       pending.map((p) => ({
         layerId: p.layer.id,
         time: p.time,
-        audible: this.isLayerAudible(p.layer, anySolo),
+        audible: isTrackAudible(p.layer.muted, p.layer.solo, anySolo),
       })),
       ACCENT_EPSILON_SECONDS,
     );

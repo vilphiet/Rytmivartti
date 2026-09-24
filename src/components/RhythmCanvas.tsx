@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { AudioEngine } from '../audio/AudioEngine';
+import type { RhythmEngine } from '../audio/RhythmEngine';
 import type { BeatEvent, RhythmLayer } from '../audio/types';
 import { withAlpha } from '../audio/layerDefaults';
 import { stepVisualState } from '../audio/pattern';
@@ -22,7 +22,7 @@ interface HitTarget {
 }
 
 interface Props {
-  engine: AudioEngine;
+  engine: RhythmEngine;
   layers: RhythmLayer[];
   onToggleStep: (layerId: string, stepIndex: number) => void;
 }
