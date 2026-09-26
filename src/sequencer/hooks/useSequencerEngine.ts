@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { SequencerEngine } from '../SequencerEngine';
 import type { AudioBus } from '../../audio/shared/AudioBus';
-import type { ScaleId, SeqTrack, SeqTrackKind } from '../types';
+import { useUndoableState } from './useUndoableState';
+import type { ScaleId, SeqProject, SeqTrack, SeqTrackKind } from '../types';
 import { cycleSeqStepVelocity, setPatternLength } from '../pattern';
 import { buildDefaultProject, buildDrumTrack, buildMelodicTrack } from '../defaultProject';
 import { drawMelodicStep, setMelodicAccent, setMelodicNoteLength } from '../melody';
@@ -35,7 +36,14 @@ export function useSequencerEngine(audioBus: AudioBus) {
   // the polyrhythm side's useRhythmEngine.
   const [initialSaved] = useState(() => loadSeqState());
 
-  const [project, setProject] = useState(() => initialSaved?.project ?? buildDefaultProject());
+  const {
+    value: project,
+    setValue: setProject,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  } = useUndoableState<SeqProject>(() => initialSaved?.project ?? buildDefaultProject());
   const [isPlaying, setIsPlaying] = useState(false);
   const [namedPatternNames, setNamedPatternNames] = useState<string[]>(() => listSeqNamedPatterns());
 
@@ -72,11 +80,11 @@ export function useSequencerEngine(audioBus: AudioBus) {
 
   const setBpm = useCallback((value: number) => {
     setProject((prev) => ({ ...prev, bpm: Math.min(MAX_BPM, Math.max(MIN_BPM, value)) }));
-  }, []);
+  }, [setProject]);
 
   const setPatternStepsCount = useCallback((steps: number) => {
     setProject((prev) => setPatternLength(prev, steps));
-  }, []);
+  }, [setProject]);
 
   const toggleStep = useCallback((trackId: string, stepIndex: number) => {
     setProject((prev) => ({
@@ -87,14 +95,14 @@ export function useSequencerEngine(audioBus: AudioBus) {
         return { ...t, steps };
       }),
     }));
-  }, []);
+  }, [setProject]);
 
   const updateTrack = useCallback((trackId: string, patch: Partial<SeqTrack>) => {
     setProject((prev) => ({
       ...prev,
       tracks: prev.tracks.map((t) => (t.id === trackId ? { ...t, ...patch } : t)),
     }));
-  }, []);
+  }, [setProject]);
 
   const addTrack = useCallback((kind: SeqTrackKind) => {
     setProject((prev) => {
@@ -105,18 +113,18 @@ export function useSequencerEngine(audioBus: AudioBus) {
           : buildDrumTrack(name, 'kick', defaultSeqSteps(), prev.patternSteps);
       return { ...prev, tracks: [...prev.tracks, newTrack] };
     });
-  }, []);
+  }, [setProject]);
 
   const removeTrack = useCallback((trackId: string) => {
     setProject((prev) => (prev.tracks.length > 1 ? { ...prev, tracks: prev.tracks.filter((t) => t.id !== trackId) } : prev));
-  }, []);
+  }, [setProject]);
 
   const mapTrackSteps = useCallback((trackId: string, mapSteps: (track: SeqTrack) => SeqTrack['steps']) => {
     setProject((prev) => ({
       ...prev,
       tracks: prev.tracks.map((t) => (t.id === trackId ? { ...t, steps: mapSteps(t) } : t)),
     }));
-  }, []);
+  }, [setProject]);
 
   const setNoteAtStep = useCallback(
     (trackId: string, stepIndex: number, note: number) => {
@@ -141,11 +149,11 @@ export function useSequencerEngine(audioBus: AudioBus) {
 
   const setRootNote = useCallback((newRootNote: number) => {
     setProject((prev) => transposeProject(prev, newRootNote));
-  }, []);
+  }, [setProject]);
 
   const setScale = useCallback((newScale: ScaleId) => {
     setProject((prev) => applyScaleToProject(prev, newScale));
-  }, []);
+  }, [setProject]);
 
   const previewNote = useCallback(
     (trackId: string, note: number, velocity: number) => {
@@ -159,7 +167,7 @@ export function useSequencerEngine(audioBus: AudioBus) {
     engine.reset();
     setIsPlaying(false);
     setProject(buildDefaultProject());
-  }, [engine]);
+  }, [engine, setProject]);
 
   const refreshNamedPatterns = useCallback(() => {
     setNamedPatternNames(listSeqNamedPatterns());
@@ -178,7 +186,7 @@ export function useSequencerEngine(audioBus: AudioBus) {
     const found = loadSeqNamedPattern(name);
     if (!found) return;
     setProject(found.project);
-  }, []);
+  }, [setProject]);
 
   const deleteNamedPatternByName = useCallback(
     (name: string) => {
@@ -206,6 +214,10 @@ export function useSequencerEngine(audioBus: AudioBus) {
     setRootNote,
     setScale,
     previewNote,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
     restoreDefaults,
     namedPatternNames,
     saveCurrentAsNamedPattern,
