@@ -1,6 +1,9 @@
 export type Waveform = OscillatorType;
 
-export type VoiceId = 'tone' | 'kick' | 'snare' | 'hihat' | 'rim' | 'sample';
+export type VoiceId = 'tone' | 'kick' | 'snare' | 'hihat' | 'rim' | 'sample' | MelodicVoiceId;
+
+/** Melodic synth presets, for the sequencer's melodic tracks. */
+export type MelodicVoiceId = 'bass' | 'lead' | 'pad' | 'pluck' | 'keys';
 
 export interface Step {
   /** 0 = off, e.g. 0.6 = normal, 1 = accent. Any 0..1 value is valid. */

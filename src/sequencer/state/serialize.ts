@@ -4,7 +4,7 @@ import { MAX_PATTERN_STEPS } from '../types';
 import type { SeqPersistedState } from './schema';
 import { SEQ_SCHEMA_VERSION } from './schema';
 
-const VALID_VOICE_IDS: readonly VoiceId[] = ['tone', 'kick', 'snare', 'hihat', 'rim', 'sample'];
+const VALID_VOICE_IDS: readonly VoiceId[] = ['tone', 'kick', 'snare', 'hihat', 'rim', 'sample', 'bass', 'lead', 'pad', 'pluck', 'keys'];
 const VALID_KINDS: readonly SeqTrackKind[] = ['drum', 'melodic'];
 const DEFAULT_BPM = 100;
 const DEFAULT_STEPS_PER_BEAT = 4;

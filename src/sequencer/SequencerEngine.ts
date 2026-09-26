@@ -81,9 +81,9 @@ export class SequencerEngine {
 
       const needsNewVoice = !this.voices.has(track.id) || !prev || prev.voiceId !== track.voiceId;
       if (needsNewVoice) {
-        // Melodic tone voices aren't wired up yet (UI lands in a later
-        // phase); a fixed waveform/frequency is fine since only drum
-        // voiceIds are actually used this phase (they ignore both args).
+        // waveform/frequency only matter for the 'tone' voiceId (unused by
+        // the sequencer); drum and melodic-synth voices ignore both and
+        // get their actual pitch per-note via play()'s options.note.
         this.voices.set(track.id, createVoice(track.voiceId, 'sine', 220, () => this.bus.getNoiseBuffer()));
       }
 

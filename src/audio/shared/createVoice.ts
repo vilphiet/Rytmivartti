@@ -3,6 +3,8 @@ import type { Voice } from '../voices/Voice';
 import { ToneVoice } from '../voices/ToneVoice';
 import { KickVoice, SnareVoice, HihatVoice, RimVoice } from '../voices/DrumVoices';
 import { SampleVoice } from '../voices/SampleVoice';
+import { MelodicSynthVoice } from '../voices/MelodicSynthVoice';
+import { SYNTH_PRESETS } from '../voices/synthPresets';
 
 /** Builds a Voice for the given voiceId. `getNoiseBuffer` is lazy (called
  * only for noise-based voices) so callers don't need an AudioContext ready
@@ -26,5 +28,11 @@ export function createVoice(
       return new SampleVoice(null);
     case 'tone':
       return new ToneVoice(waveform, frequency);
+    case 'bass':
+    case 'lead':
+    case 'pad':
+    case 'pluck':
+    case 'keys':
+      return new MelodicSynthVoice(SYNTH_PRESETS[voiceId]);
   }
 }
