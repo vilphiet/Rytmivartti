@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import type { AudioBus } from '../../audio/shared/AudioBus';
-import { PatternLibrary } from '../../components/PatternLibrary';
 import { useSequencerEngine } from '../hooks/useSequencerEngine';
 import { scaleChangeAffectsNotes } from '../scale';
 import type { ScaleId } from '../types';
 import { StepGrid } from './StepGrid';
-import { SequencerTransport } from './SequencerTransport';
+import { SequencerTopBar } from './SequencerTopBar';
+import { SequencerMenu } from './SequencerMenu';
 import { TrackSettingsPanel } from './TrackSettingsPanel';
 import { PianoRoll } from './PianoRoll';
 
@@ -37,7 +37,12 @@ export function SequencerTab({ audioBus }: Props) {
     setRootNote,
     setScale,
     previewNote,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
     restoreDefaults,
+    clearPattern,
     namedPatternNames,
     saveCurrentAsNamedPattern,
     loadNamedPatternByName,
@@ -46,6 +51,7 @@ export function SequencerTab({ audioBus }: Props) {
 
   const [openTrackId, setOpenTrackId] = useState<string | null>(null);
   const [pianoRollTrackId, setPianoRollTrackId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const openTrack = project.tracks.find((t) => t.id === openTrackId) ?? null;
   const pianoRollTrack = project.tracks.find((t) => t.id === pianoRollTrackId) ?? null;
 
@@ -57,7 +63,21 @@ export function SequencerTab({ audioBus }: Props) {
   };
 
   return (
-    <main className="app-main">
+    <div className="seq-page">
+      <SequencerTopBar
+        isPlaying={isPlaying}
+        onToggle={toggle}
+        bpm={project.bpm}
+        bpmRange={bpmRange}
+        onBpmChange={setBpm}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={undo}
+        onRedo={redo}
+        menuOpen={menuOpen}
+        onToggleMenu={() => setMenuOpen((v) => !v)}
+      />
+
       <div className="seq-main">
         <StepGrid
           engine={engine}
@@ -112,28 +132,23 @@ export function SequencerTab({ audioBus }: Props) {
         </div>
       </div>
 
-      <div className="side-panel">
-        <SequencerTransport
-          isPlaying={isPlaying}
-          bpm={project.bpm}
-          bpmRange={bpmRange}
+      {menuOpen && (
+        <SequencerMenu
           patternSteps={project.patternSteps}
-          rootNote={project.rootNote}
-          scale={project.scale}
-          onToggle={toggle}
-          onBpmChange={setBpm}
           onPatternStepsChange={setPatternStepsCount}
+          rootNote={project.rootNote}
           onRootNoteChange={setRootNote}
+          scale={project.scale}
           onScaleChange={handleScaleChange}
-        />
-        <PatternLibrary
           namedPatternNames={namedPatternNames}
-          onSave={saveCurrentAsNamedPattern}
-          onLoad={loadNamedPatternByName}
-          onDelete={deleteNamedPatternByName}
-          onRestoreDefaults={restoreDefaults}
+          onSaveNamedPattern={saveCurrentAsNamedPattern}
+          onLoadNamedPattern={loadNamedPatternByName}
+          onDeleteNamedPattern={deleteNamedPatternByName}
+          onClearPattern={clearPattern}
+          onNewProject={restoreDefaults}
+          onClose={() => setMenuOpen(false)}
         />
-      </div>
-    </main>
+      )}
+    </div>
   );
 }

@@ -3,7 +3,7 @@ import { SequencerEngine } from '../SequencerEngine';
 import type { AudioBus } from '../../audio/shared/AudioBus';
 import { useUndoableState } from './useUndoableState';
 import type { ScaleId, SeqProject, SeqTrack, SeqTrackKind } from '../types';
-import { cycleSeqStepVelocity, setPatternLength } from '../pattern';
+import { clearAllSteps, cycleSeqStepVelocity, setPatternLength } from '../pattern';
 import { buildDefaultProject, buildDrumTrack, buildMelodicTrack } from '../defaultProject';
 import { drawMelodicStep, setMelodicAccent, setMelodicNoteLength } from '../melody';
 import { applyScaleToProject, transposeProject } from '../scale';
@@ -169,6 +169,10 @@ export function useSequencerEngine(audioBus: AudioBus) {
     setProject(buildDefaultProject());
   }, [engine, setProject]);
 
+  const clearPattern = useCallback(() => {
+    setProject((prev) => clearAllSteps(prev));
+  }, [setProject]);
+
   const refreshNamedPatterns = useCallback(() => {
     setNamedPatternNames(listSeqNamedPatterns());
   }, []);
@@ -219,6 +223,7 @@ export function useSequencerEngine(audioBus: AudioBus) {
     canUndo,
     canRedo,
     restoreDefaults,
+    clearPattern,
     namedPatternNames,
     saveCurrentAsNamedPattern,
     loadNamedPatternByName,

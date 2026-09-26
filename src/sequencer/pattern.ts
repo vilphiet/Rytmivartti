@@ -34,3 +34,14 @@ export function setPatternLength(project: SeqProject, patternSteps: number): Seq
     tracks: project.tracks.map((t) => ({ ...t, lengthSteps: clamped })),
   };
 }
+
+/** "Tyhjennä kuvio": clears every track's steps (drum and melodic alike —
+ * an all-off SeqStep array is a valid empty state for both), keeping the
+ * tracks themselves, their voices, names, and every other project setting
+ * untouched. */
+export function clearAllSteps(project: SeqProject): SeqProject {
+  return {
+    ...project,
+    tracks: project.tracks.map((t) => ({ ...t, steps: defaultSeqSteps() })),
+  };
+}

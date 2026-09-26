@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cycleSeqStepVelocity, defaultSeqSteps, seqStepVisualState, setPatternLength, SEQ_STEP_ACCENT, SEQ_STEP_NORMAL, SEQ_STEP_OFF } from './pattern';
+import { clearAllSteps, cycleSeqStepVelocity, defaultSeqSteps, seqStepVisualState, setPatternLength, SEQ_STEP_ACCENT, SEQ_STEP_NORMAL, SEQ_STEP_OFF } from './pattern';
 import { MAX_PATTERN_STEPS } from './types';
 import type { SeqProject, SeqTrack } from './types';
 
@@ -65,5 +65,34 @@ describe('setPatternLength', () => {
     const project: SeqProject = buildProject([buildTrack('a')]);
     expect(setPatternLength(project, 0).patternSteps).toBe(1);
     expect(setPatternLength(project, 999).patternSteps).toBe(MAX_PATTERN_STEPS);
+  });
+});
+
+describe('clearAllSteps', () => {
+  it('clears every track\'s steps to all-off, keeping tracks/voices/names/settings untouched', () => {
+    const trackA = buildTrack('a');
+    trackA.steps[2] = { velocity: SEQ_STEP_ACCENT };
+    trackA.name = 'Kick';
+    trackA.voiceId = 'snare';
+    const trackB = buildTrack('b');
+    trackB.steps[5] = { velocity: SEQ_STEP_NORMAL };
+    const project = buildProject([trackA, trackB]);
+
+    const cleared = clearAllSteps(project);
+
+    expect(cleared.tracks[0].steps.every((s) => s.velocity === SEQ_STEP_OFF)).toBe(true);
+    expect(cleared.tracks[1].steps.every((s) => s.velocity === SEQ_STEP_OFF)).toBe(true);
+    expect(cleared.tracks[0].name).toBe('Kick');
+    expect(cleared.tracks[0].voiceId).toBe('snare');
+    expect(cleared.tracks.map((t) => t.id)).toEqual(['a', 'b']);
+    expect(cleared.bpm).toBe(project.bpm);
+    expect(cleared.patternSteps).toBe(project.patternSteps);
+  });
+
+  it('works for a melodic track too (an all-off array is a valid empty pattern)', () => {
+    const melodic: SeqTrack = { ...buildTrack('m'), kind: 'melodic', voiceId: 'bass' };
+    melodic.steps[3] = { velocity: SEQ_STEP_NORMAL, note: 60, length: 2 };
+    const cleared = clearAllSteps(buildProject([melodic]));
+    expect(cleared.tracks[0].steps.every((s) => s.velocity === SEQ_STEP_OFF && s.note === undefined)).toBe(true);
   });
 });

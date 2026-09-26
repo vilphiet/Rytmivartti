@@ -817,3 +817,137 @@ input[type='range'] {
   padding: 1px 6px;
   gap: 3px;
 }
+
+.seq-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.seq-top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin: -20px -20px 0;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.seq-top-bar-play {
+  flex: 1 1 96px;
+  min-width: 96px;
+  padding: 12px 14px;
+}
+
+.seq-bpm-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.seq-bpm-step {
+  min-width: 40px;
+  min-height: 40px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.seq-bpm-value {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: var(--text);
+  min-width: 64px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.seq-top-bar-menu-btn {
+  font-size: 1.1rem;
+  font-weight: 700;
+  min-width: 40px;
+  min-height: 40px;
+}
+
+@media (max-width: 640px) {
+  .seq-top-bar {
+    margin: -16px -16px 0;
+  }
+}
+
+.seq-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(3, 6, 12, 0.6);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.seq-menu {
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 20px 20px 0 0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.seq-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.seq-menu-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.seq-menu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.seq-menu-section h3 {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.seq-menu-danger-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.seq-menu-danger-item p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
