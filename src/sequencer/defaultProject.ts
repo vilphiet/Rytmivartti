@@ -46,6 +46,8 @@ export function buildDefaultProject(): SeqProject {
     bpm: DEFAULT_SEQ_BPM,
     stepsPerBeat: DEFAULT_STEPS_PER_BEAT,
     patternSteps,
+    rootNote: 0,
+    scale: 'major',
     tracks: [
       buildDrumTrack(
         'Kick',

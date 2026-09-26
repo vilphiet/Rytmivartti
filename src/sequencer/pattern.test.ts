@@ -18,6 +18,10 @@ function buildTrack(id: string): SeqTrack {
   };
 }
 
+function buildProject(tracks: SeqTrack[]): SeqProject {
+  return { bpm: 100, stepsPerBeat: 4, patternSteps: 16, rootNote: 0, scale: 'major', tracks };
+}
+
 describe('cycleSeqStepVelocity', () => {
   it('cycles off -> normal -> accent -> off', () => {
     expect(cycleSeqStepVelocity(SEQ_STEP_OFF)).toBe(SEQ_STEP_NORMAL);
@@ -36,7 +40,7 @@ describe('seqStepVisualState', () => {
 
 describe('setPatternLength', () => {
   it('changes patternSteps and every track lengthSteps without touching steps arrays', () => {
-    const project: SeqProject = { bpm: 100, stepsPerBeat: 4, patternSteps: 16, tracks: [buildTrack('a'), buildTrack('b')] };
+    const project: SeqProject = buildProject([buildTrack('a'), buildTrack('b')]);
     const shrunk = setPatternLength(project, 8);
     expect(shrunk.patternSteps).toBe(8);
     expect(shrunk.tracks.every((t) => t.lengthSteps === 8)).toBe(true);
@@ -49,7 +53,7 @@ describe('setPatternLength', () => {
     track.steps[12] = { velocity: SEQ_STEP_NORMAL };
     const original = [...track.steps];
 
-    let project: SeqProject = { bpm: 100, stepsPerBeat: 4, patternSteps: 16, tracks: [track] };
+    let project: SeqProject = buildProject([track]);
     project = setPatternLength(project, 8);
     project = setPatternLength(project, 16);
 
@@ -58,7 +62,7 @@ describe('setPatternLength', () => {
   });
 
   it('clamps to [1, MAX_PATTERN_STEPS]', () => {
-    const project: SeqProject = { bpm: 100, stepsPerBeat: 4, patternSteps: 16, tracks: [buildTrack('a')] };
+    const project: SeqProject = buildProject([buildTrack('a')]);
     expect(setPatternLength(project, 0).patternSteps).toBe(1);
     expect(setPatternLength(project, 999).patternSteps).toBe(MAX_PATTERN_STEPS);
   });

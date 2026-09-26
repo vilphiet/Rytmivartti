@@ -25,6 +25,8 @@ function buildProject(): SeqProject {
     bpm: 100,
     stepsPerBeat: 4,
     patternSteps: 16,
+    rootNote: 0,
+    scale: 'major',
     tracks: [
       { id: 'kick', name: 'Kick', kind: 'drum', voiceId: 'kick', gain: 0.9, pan: 0, mute: false, solo: false, lengthSteps: 16, steps: defaultSeqSteps() },
     ],

@@ -12,7 +12,7 @@ const LOOKAHEAD_INTERVAL_MS = 25;
 const START_LEAD = 0.08;
 const MIX_RAMP_TIME = 0.01;
 
-const EMPTY_PROJECT: SeqProject = { bpm: 100, stepsPerBeat: 4, patternSteps: 16, tracks: [] };
+const EMPTY_PROJECT: SeqProject = { bpm: 100, stepsPerBeat: 4, patternSteps: 16, rootNote: 0, scale: 'major', tracks: [] };
 
 /**
  * Look-ahead scheduler for the step sequencer, same principle as

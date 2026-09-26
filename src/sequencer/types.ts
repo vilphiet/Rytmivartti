@@ -17,6 +17,8 @@ export interface SeqStep {
 
 export type SeqTrackKind = 'drum' | 'melodic';
 
+export type ScaleId = 'major' | 'naturalMinor' | 'majorPentatonic' | 'minorPentatonic' | 'dorian' | 'chromatic';
+
 export interface SeqTrack {
   id: string;
   name: string;
@@ -38,5 +40,11 @@ export interface SeqProject {
   stepsPerBeat: number;
   /** The project-wide default/displayed pattern length (8/16/32). */
   patternSteps: number;
+  /** Pitch class 0-11 (0 = C), shared by every melodic track. Changing it
+   * transposes all melodic notes by the same interval (see scale.ts). */
+  rootNote: number;
+  /** Shared by every melodic track. Changing it snaps any note outside
+   * the new scale to the nearest scale tone (see scale.ts). */
+  scale: ScaleId;
   tracks: SeqTrack[];
 }
