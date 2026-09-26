@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clearMelodicNote, drawMelodicStep, isNoteHead, melodicCellVisual, setMelodicAccent, setMelodicNote, setMelodicNoteLength } from './melody';
+import { clearMelodicNote, isNoteHead, melodicCellVisual, setMelodicAccent, setMelodicNote, setMelodicNoteLength } from './melody';
 import { defaultSeqSteps, SEQ_STEP_ACCENT, SEQ_STEP_NORMAL } from './pattern';
 import type { SeqStep } from './types';
 
@@ -46,28 +46,6 @@ describe('setMelodicNote (monophony)', () => {
     steps = setMelodicNote(steps, 0, 60); // length 1, covers only step 0
     steps = setMelodicNote(steps, 3, 62);
     expect(steps[0]).toMatchObject({ note: 60, length: 1 });
-  });
-});
-
-describe('drawMelodicStep', () => {
-  it('places a note on an empty/covered cell', () => {
-    const steps = drawMelodicStep(defaultSeqSteps(), 4, 60);
-    expect(steps[4]).toMatchObject({ note: 60, velocity: SEQ_STEP_NORMAL });
-  });
-
-  it('deletes an existing note head when tapped at its own pitch', () => {
-    let steps = defaultSeqSteps();
-    steps = drawMelodicStep(steps, 4, 60);
-    steps = drawMelodicStep(steps, 4, 60);
-    expect(isNoteHead(steps[4])).toBe(false);
-    expect(steps[4].velocity).toBe(0);
-  });
-
-  it('relocates rather than deletes when tapped at a different pitch (a different piano-roll row, same column)', () => {
-    let steps = defaultSeqSteps();
-    steps = drawMelodicStep(steps, 4, 60);
-    steps = drawMelodicStep(steps, 4, 64); // different row, same step
-    expect(steps[4]).toMatchObject({ note: 64, length: 1 });
   });
 });
 

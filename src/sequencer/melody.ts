@@ -85,18 +85,6 @@ export function clearMelodicNote(steps: SeqStep[], index: number): SeqStep[] {
   return next;
 }
 
-/** The "Piirrä" (draw) tool: tapping the exact cell that already shows a
- * note (same step index AND same pitch) deletes it; tapping anything else
- * — a truly empty step, a step covered by another note's sustain, or even
- * an occupied step at a *different* pitch row than its current note —
- * places a new note there instead (relocating an existing note to a new
- * pitch reads, visually, as tapping an empty cell at that pitch). */
-export function drawMelodicStep(steps: SeqStep[], index: number, note: number, velocity: number = SEQ_STEP_NORMAL): SeqStep[] {
-  const existing = steps[index];
-  const isExactHead = isNoteHead(existing) && existing.note === note;
-  return isExactHead ? clearMelodicNote(steps, index) : setMelodicNote(steps, index, note, velocity);
-}
-
 /** The "Pituus" (length) tool: extends/shortens the note at `headIndex` so
  * it reaches `targetIndex`, clamped to never reach the next note head nor
  * past `lengthSteps` (the pattern's currently visible/playable length). A

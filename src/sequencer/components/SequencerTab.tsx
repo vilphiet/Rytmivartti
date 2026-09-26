@@ -34,6 +34,7 @@ export function SequencerTab({ audioBus }: Props) {
     clearTrack,
     duplicateTrackAction,
     setNoteAtStep,
+    deleteNoteAtStep,
     setNoteLength,
     setNoteAccent,
     setRootNote,
@@ -117,7 +118,12 @@ export function SequencerTab({ audioBus }: Props) {
             track={pianoRollTrack}
             rootNote={project.rootNote}
             scale={project.scale}
-            onDraw={(index, note) => setNoteAtStep(pianoRollTrack.id, index, note)}
+            isPlaying={isPlaying}
+            onToggle={toggle}
+            canUndo={canUndo}
+            onUndo={undo}
+            onCreateNote={(index, note) => setNoteAtStep(pianoRollTrack.id, index, note)}
+            onDeleteNote={(index) => deleteNoteAtStep(pianoRollTrack.id, index)}
             onSetLength={(headIndex, targetIndex) => setNoteLength(pianoRollTrack.id, headIndex, targetIndex)}
             onSetAccent={(index, isAccent) => setNoteAccent(pianoRollTrack.id, index, isAccent)}
             onPreviewNote={(note, velocity) => previewNote(pianoRollTrack.id, note, velocity)}

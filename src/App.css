@@ -798,54 +798,55 @@ input[type='range'] {
   border-color: #fff;
 }
 
-.seq-track-settings-header h3,
-.piano-roll-header h3 {
+.seq-track-settings-header h3 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.piano-roll {
+.piano-roll-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 16px;
-  min-width: 0;
+  gap: 10px;
+  background: var(--bg);
+  padding: 12px;
+  overflow-y: auto;
 }
 
-.piano-roll-header {
+.piano-roll-topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.piano-roll-subheader {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-shrink: 0;
 }
 
-.piano-roll-header h3 {
+.piano-roll-subheader h3 {
   margin: 0;
   font-size: 0.95rem;
   color: var(--text);
-}
-
-.piano-roll-tools {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .piano-roll-octave-buttons {
   display: flex;
   gap: 6px;
+  flex-shrink: 0;
 }
 
-.piano-roll-scroll {
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: 420px;
+.piano-roll-rows {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -857,32 +858,59 @@ input[type='range'] {
 
 .proll-row {
   display: flex;
-  align-items: stretch;
-  min-width: min-content;
+  align-items: center;
+  gap: 8px;
+  border-radius: 6px;
+}
+
+.proll-row-root {
+  background: rgba(79, 216, 232, 0.08);
 }
 
 .proll-row-header {
-  position: sticky;
-  left: 0;
-  z-index: 2;
   display: flex;
   align-items: center;
-  padding: 2px 8px;
-  background: #0d1220;
-  border-right: 1px solid var(--border);
   flex-shrink: 0;
-  min-width: 44px;
+  min-width: 36px;
   font-size: 0.72rem;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
 
-.proll-row-cells {
-  position: relative;
+.proll-row-root .proll-row-header {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.seq-cell-selected {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
+}
+
+.piano-roll-note-toolbar {
+  position: sticky;
+  bottom: 0;
   display: flex;
   align-items: center;
-  padding: 1px 6px;
-  gap: 3px;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-top: auto;
+}
+
+.piano-roll-note-toolbar-name {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.piano-roll-note-toolbar-length {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  min-width: 1.5em;
+  text-align: center;
 }
 
 .seq-page {

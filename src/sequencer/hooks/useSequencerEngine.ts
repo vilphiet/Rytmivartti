@@ -5,7 +5,7 @@ import { useUndoableState } from './useUndoableState';
 import type { ScaleId, SeqProject, SeqTrack, SeqTrackKind } from '../types';
 import { clearAllSteps, clearTrackSteps, cycleSeqStepVelocity, setPatternLength } from '../pattern';
 import { buildDefaultProject, buildDrumTrack, buildMelodicTrack, makeTrackId } from '../defaultProject';
-import { drawMelodicStep, setMelodicAccent, setMelodicNoteLength } from '../melody';
+import { clearMelodicNote, setMelodicAccent, setMelodicNote, setMelodicNoteLength } from '../melody';
 import { applyScaleToProject, transposeProject } from '../scale';
 import { seqStepIntervalSeconds } from '../scheduling';
 import { defaultSeqSteps } from '../pattern';
@@ -144,9 +144,20 @@ export function useSequencerEngine(audioBus: AudioBus) {
     }));
   }, [setProject]);
 
+  // Places (or relocates) a note at stepIndex/note. Tapping an existing
+  // note of its own pitch is handled entirely in the piano roll's own
+  // selection state now (it only selects, never deletes here) -- deleting
+  // a note is a separate, explicit action (see deleteNoteAtStep).
   const setNoteAtStep = useCallback(
     (trackId: string, stepIndex: number, note: number) => {
-      mapTrackSteps(trackId, (t) => drawMelodicStep(t.steps, stepIndex, note));
+      mapTrackSteps(trackId, (t) => setMelodicNote(t.steps, stepIndex, note));
+    },
+    [mapTrackSteps],
+  );
+
+  const deleteNoteAtStep = useCallback(
+    (trackId: string, stepIndex: number) => {
+      mapTrackSteps(trackId, (t) => clearMelodicNote(t.steps, stepIndex));
     },
     [mapTrackSteps],
   );
@@ -233,6 +244,7 @@ export function useSequencerEngine(audioBus: AudioBus) {
     clearTrack,
     duplicateTrackAction,
     setNoteAtStep,
+    deleteNoteAtStep,
     setNoteLength,
     setNoteAccent,
     setRootNote,
