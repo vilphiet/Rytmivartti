@@ -698,3 +698,122 @@ input[type='range'] {
     font-size: 0.78rem;
   }
 }
+
+.seq-add-track-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.seq-cell-melodic-head {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  min-height: 40px;
+  align-self: stretch;
+  border-radius: 6px;
+  border: 1.5px solid var(--accent);
+  background: var(--accent);
+  color: #05070d;
+  cursor: pointer;
+  padding: 0 4px;
+  touch-action: manipulation;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.seq-cell-melodic-head.seq-cell-accent {
+  border-width: 2.5px;
+  border-color: #fff;
+}
+
+.seq-track-settings-header h3,
+.piano-roll-header h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.piano-roll {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  min-width: 0;
+}
+
+.piano-roll-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.piano-roll-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.piano-roll-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.piano-roll-octave-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.piano-roll-scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: radial-gradient(circle at center, #0b1220 0%, #060910 100%);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 8px;
+}
+
+.proll-row {
+  display: flex;
+  align-items: stretch;
+  min-width: min-content;
+}
+
+.proll-row-header {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: #0d1220;
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
+  min-width: 44px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.proll-row-cells {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 1px 6px;
+  gap: 3px;
+}

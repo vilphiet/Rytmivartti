@@ -37,6 +37,23 @@ export function buildDrumTrack(name: string, voiceId: VoiceId, steps: SeqStep[],
   };
 }
 
+/** A new melodic track: Basso, empty pattern (so it's silent until the
+ * player draws notes into it). */
+export function buildMelodicTrack(name: string, lengthSteps: number): SeqTrack {
+  return {
+    id: makeTrackId(),
+    name,
+    kind: 'melodic',
+    voiceId: 'bass',
+    gain: 0.8,
+    pan: 0,
+    mute: false,
+    solo: false,
+    lengthSteps,
+    steps: defaultSeqSteps(),
+  };
+}
+
 /** 4 drum tracks pre-loaded with a simple basic beat, so Play does
  * something immediately: kick on 1 and 3, snare on 2 and 4, steady
  * eighth-note hihat, rim left empty for the player to fill in. */

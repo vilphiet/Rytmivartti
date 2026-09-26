@@ -150,6 +150,19 @@ export class SequencerEngine {
     this.nextIndex = 0;
   }
 
+  /** Triggers a track's voice immediately, bypassing the transport/
+   * scheduling loop entirely (works whether or not the sequencer is
+   * playing) — used for a piano-roll note-placement preview. */
+  previewNote(trackId: string, note: number, velocity: number, duration: number): void {
+    const ctx = this.bus.ensureContext();
+    if (ctx.state === 'suspended') void ctx.resume();
+    const voice = this.voices.get(trackId);
+    const nodes = this.trackMixers.get(trackId);
+    if (!voice || !nodes) return;
+    const time = ctx.currentTime + 0.01;
+    voice.play(time, velocity, nodes.gain, { note, duration });
+  }
+
   /** Tears down only this engine's own resources (timer, per-track voices
    * and mixer nodes). Never touches the shared AudioBus. */
   dispose() {

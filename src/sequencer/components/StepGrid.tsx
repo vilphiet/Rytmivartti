@@ -1,45 +1,23 @@
-import { useEffect, useRef } from 'react';
 import type { SequencerEngine } from '../SequencerEngine';
 import type { SeqProject, SeqTrack } from '../types';
 import { seqStepVisualState } from '../pattern';
-
-const CELL_WIDTH_PX = 36;
-const CELL_GAP_PX = 3;
-const GROUP_SIZE = 4;
-const STEP_SPAN_PX = CELL_WIDTH_PX + CELL_GAP_PX;
+import { melodicCellVisual } from '../melody';
+import { noteName } from '../noteNames';
+import { useStepPlayheadX } from './useStepPlayheadX';
+import { CELL_GAP_PX, CELL_WIDTH_PX, GROUP_SIZE, STEP_SPAN_PX } from './gridConstants';
 
 interface Props {
   engine: SequencerEngine;
   project: SeqProject;
   onToggleStep: (trackId: string, stepIndex: number) => void;
   onOpenTrackSettings: (trackId: string) => void;
+  onOpenPianoRoll: (trackId: string) => void;
   onToggleMute: (trackId: string) => void;
   onToggleSolo: (trackId: string) => void;
 }
 
-export function StepGrid({ engine, project, onToggleStep, onOpenTrackSettings, onToggleMute, onToggleSolo }: Props) {
-  const playheadRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-
-  useEffect(() => {
-    let raf = 0;
-
-    const draw = () => {
-      raf = requestAnimationFrame(draw);
-      const stepDuration = engine.getStepDuration();
-      const baseStartTime = engine.getBaseStartTime();
-      const referenceTime = engine.getReferenceTime();
-      const patternSteps = Math.max(1, project.patternSteps);
-      const elapsedSteps = (referenceTime - baseStartTime) / stepDuration;
-      const currentStep = ((Math.floor(elapsedSteps) % patternSteps) + patternSteps) % patternSteps;
-      const x = (currentStep * STEP_SPAN_PX).toFixed(2);
-      for (const el of playheadRefs.current.values()) {
-        el.style.transform = `translateX(${x}px)`;
-      }
-    };
-
-    raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
-  }, [engine, project.patternSteps]);
+export function StepGrid({ engine, project, onToggleStep, onOpenTrackSettings, onOpenPianoRoll, onToggleMute, onToggleSolo }: Props) {
+  const playheadTargets = useStepPlayheadX(engine, project.patternSteps);
 
   const visibleSteps = project.patternSteps;
   const rowWidth = visibleSteps * STEP_SPAN_PX;
@@ -55,12 +33,10 @@ export function StepGrid({ engine, project, onToggleStep, onOpenTrackSettings, o
             rowWidth={rowWidth}
             onToggleStep={onToggleStep}
             onOpenTrackSettings={onOpenTrackSettings}
+            onOpenPianoRoll={onOpenPianoRoll}
             onToggleMute={onToggleMute}
             onToggleSolo={onToggleSolo}
-            playheadRef={(el) => {
-              if (el) playheadRefs.current.set(track.id, el);
-              else playheadRefs.current.delete(track.id);
-            }}
+            playheadTargets={playheadTargets}
           />
         ))}
       </div>
@@ -74,23 +50,41 @@ interface SeqRowProps {
   rowWidth: number;
   onToggleStep: (trackId: string, stepIndex: number) => void;
   onOpenTrackSettings: (trackId: string) => void;
+  onOpenPianoRoll: (trackId: string) => void;
   onToggleMute: (trackId: string) => void;
   onToggleSolo: (trackId: string) => void;
-  playheadRef: (el: HTMLDivElement | null) => void;
+  playheadTargets: ReturnType<typeof useStepPlayheadX>;
 }
 
-function SeqRow({ track, visibleSteps, rowWidth, onToggleStep, onOpenTrackSettings, onToggleMute, onToggleSolo, playheadRef }: SeqRowProps) {
+function SeqRow({
+  track,
+  visibleSteps,
+  rowWidth,
+  onToggleStep,
+  onOpenTrackSettings,
+  onOpenPianoRoll,
+  onToggleMute,
+  onToggleSolo,
+  playheadTargets,
+}: SeqRowProps) {
+  const isMelodic = track.kind === 'melodic';
+
   return (
     <div className="seq-row">
       <div className="seq-row-header">
         <button
           type="button"
           className="seq-row-name"
-          onClick={() => onOpenTrackSettings(track.id)}
-          title="Raidan asetukset"
+          onClick={() => (isMelodic ? onOpenPianoRoll(track.id) : onOpenTrackSettings(track.id))}
+          title={isMelodic ? 'Piano roll' : 'Raidan asetukset'}
         >
           {track.name}
         </button>
+        {isMelodic && (
+          <button type="button" className="icon-btn" title="Asetukset" aria-label="Asetukset" onClick={() => onOpenTrackSettings(track.id)}>
+            ⚙
+          </button>
+        )}
         <button
           type="button"
           className={`icon-btn${track.mute ? ' active' : ''}`}
@@ -112,22 +106,67 @@ function SeqRow({ track, visibleSteps, rowWidth, onToggleStep, onOpenTrackSettin
       </div>
 
       <div className="seq-row-cells" style={{ width: rowWidth }}>
-        {track.steps.slice(0, visibleSteps).map((step, k) => {
-          const state = seqStepVisualState(step.velocity);
-          const groupStart = k % GROUP_SIZE === 0 && k !== 0;
-          return (
-            <button
-              key={k}
-              type="button"
-              className={`seq-cell seq-cell-${state}${groupStart ? ' seq-cell-group-start' : ''}`}
-              style={{ width: CELL_WIDTH_PX }}
-              onClick={() => onToggleStep(track.id, k)}
-              aria-label={`${track.name}, askel ${k + 1}, tila ${state}`}
-            />
-          );
-        })}
-        <div className="seq-playhead" ref={playheadRef} style={{ width: CELL_WIDTH_PX }} />
+        {Array.from({ length: visibleSteps }, (_, k) => k).map((k) =>
+          isMelodic ? (
+            <MelodicCell key={k} track={track} index={k} />
+          ) : (
+            <DrumCell key={k} track={track} index={k} onToggleStep={onToggleStep} />
+          ),
+        )}
+        <div
+          className="seq-playhead"
+          ref={(el) => {
+            if (!el) return;
+            playheadTargets.current.add(el);
+            return () => {
+              playheadTargets.current.delete(el);
+            };
+          }}
+          style={{ width: CELL_WIDTH_PX }}
+        />
       </div>
     </div>
   );
+}
+
+function DrumCell({ track, index, onToggleStep }: { track: SeqTrack; index: number; onToggleStep: (trackId: string, stepIndex: number) => void }) {
+  const step = track.steps[index];
+  const state = seqStepVisualState(step.velocity);
+  const groupStart = index % GROUP_SIZE === 0 && index !== 0;
+  return (
+    <button
+      type="button"
+      className={`seq-cell seq-cell-${state}${groupStart ? ' seq-cell-group-start' : ''}`}
+      style={{ width: CELL_WIDTH_PX }}
+      onClick={() => onToggleStep(track.id, index)}
+      aria-label={`${track.name}, askel ${index + 1}, tila ${state}`}
+    />
+  );
+}
+
+/** Read-only in the main grid — melodic notes are edited via the piano
+ * roll, which has the pitch axis a plain step cell doesn't. A note's
+ * covered steps render nothing at all (not even a placeholder): the
+ * head's own width already spans them (length cells plus their internal
+ * gaps), so the row stays the correct total width without doubling up —
+ * flexbox's `gap` only applies between actually-rendered siblings, so the
+ * next real cell after a long note is still spaced exactly one gap away. */
+function MelodicCell({ track, index }: { track: SeqTrack; index: number }) {
+  const visual = melodicCellVisual(track.steps, index);
+  const groupStart = index % GROUP_SIZE === 0 && index !== 0;
+
+  if (visual.kind === 'covered') return null;
+
+  if (visual.kind === 'head') {
+    return (
+      <div
+        className={`seq-cell seq-cell-melodic-head${visual.isAccent ? ' seq-cell-accent' : ''}${groupStart ? ' seq-cell-group-start' : ''}`}
+        style={{ width: CELL_WIDTH_PX * visual.length + (visual.length - 1) * CELL_GAP_PX }}
+      >
+        {noteName(visual.note)}
+      </div>
+    );
+  }
+
+  return <div className={`seq-cell seq-cell-off${groupStart ? ' seq-cell-group-start' : ''}`} style={{ width: CELL_WIDTH_PX }} />;
 }

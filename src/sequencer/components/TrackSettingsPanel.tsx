@@ -1,12 +1,18 @@
-import type { VoiceId } from '../../audio/types';
+import type { MelodicVoiceId, VoiceId } from '../../audio/types';
+import { SYNTH_PRESETS } from '../../audio/voices/synthPresets';
 import type { SeqTrack } from '../types';
 
-const VOICE_OPTIONS: { id: VoiceId; label: string }[] = [
+const DRUM_VOICE_OPTIONS: { id: VoiceId; label: string }[] = [
   { id: 'kick', label: 'Kick' },
   { id: 'snare', label: 'Snare' },
   { id: 'hihat', label: 'Hi-hat' },
   { id: 'rim', label: 'Rim' },
 ];
+
+const MELODIC_VOICE_OPTIONS: { id: VoiceId; label: string }[] = (Object.keys(SYNTH_PRESETS) as MelodicVoiceId[]).map((id) => ({
+  id,
+  label: SYNTH_PRESETS[id].label,
+}));
 
 interface Props {
   track: SeqTrack;
@@ -17,6 +23,7 @@ interface Props {
 }
 
 export function TrackSettingsPanel({ track, canRemove, onUpdate, onRemove, onClose }: Props) {
+  const voiceOptions = track.kind === 'melodic' ? MELODIC_VOICE_OPTIONS : DRUM_VOICE_OPTIONS;
   return (
     <div className="seq-track-settings">
       <div className="seq-track-settings-header">
@@ -29,7 +36,7 @@ export function TrackSettingsPanel({ track, canRemove, onUpdate, onRemove, onClo
       <label className="layer-field">
         <span>Ääni</span>
         <select value={track.voiceId} onChange={(e) => onUpdate({ voiceId: e.target.value as VoiceId })}>
-          {VOICE_OPTIONS.map((v) => (
+          {voiceOptions.map((v) => (
             <option key={v.id} value={v.id}>
               {v.label}
             </option>

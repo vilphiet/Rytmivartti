@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { SequencerEngine } from '../SequencerEngine';
 import type { AudioBus } from '../../audio/shared/AudioBus';
-import type { SeqTrack } from '../types';
-import { cycleSeqStepVelocity, defaultSeqSteps, setPatternLength } from '../pattern';
-import { buildDefaultProject, makeTrackId } from '../defaultProject';
+import type { ScaleId, SeqTrack, SeqTrackKind } from '../types';
+import { cycleSeqStepVelocity, setPatternLength } from '../pattern';
+import { buildDefaultProject, buildDrumTrack, buildMelodicTrack } from '../defaultProject';
+import { drawMelodicStep, setMelodicAccent, setMelodicNoteLength } from '../melody';
+import { applyScaleToProject, transposeProject } from '../scale';
+import { seqStepIntervalSeconds } from '../scheduling';
+import { defaultSeqSteps } from '../pattern';
 import { serializeSeqState } from '../state/serialize';
 import {
   deleteSeqNamedPattern,
@@ -18,6 +22,10 @@ import { useDebouncedAutosave } from '../../hooks/useDebouncedAutosave';
 const MIN_BPM = 40;
 const MAX_BPM = 240;
 const AUTOSAVE_DEBOUNCE_MS = 500;
+/** Matches voiceDurationSeconds's own note-duration convention (a normal
+ * scheduled note also gets 90% of a step's duration, leaving a small gap
+ * before the next). */
+const PREVIEW_DURATION_RATIO = 0.9;
 
 export function useSequencerEngine(audioBus: AudioBus) {
   const [engine] = useState(() => new SequencerEngine(audioBus));
@@ -88,20 +96,13 @@ export function useSequencerEngine(audioBus: AudioBus) {
     }));
   }, []);
 
-  const addTrack = useCallback(() => {
+  const addTrack = useCallback((kind: SeqTrackKind) => {
     setProject((prev) => {
-      const newTrack: SeqTrack = {
-        id: makeTrackId(),
-        name: `Raita ${prev.tracks.length + 1}`,
-        kind: 'drum',
-        voiceId: 'kick',
-        gain: 0.8,
-        pan: 0,
-        mute: false,
-        solo: false,
-        lengthSteps: prev.patternSteps,
-        steps: defaultSeqSteps(),
-      };
+      const name = `Raita ${prev.tracks.length + 1}`;
+      const newTrack: SeqTrack =
+        kind === 'melodic'
+          ? buildMelodicTrack(name, prev.patternSteps)
+          : buildDrumTrack(name, 'kick', defaultSeqSteps(), prev.patternSteps);
       return { ...prev, tracks: [...prev.tracks, newTrack] };
     });
   }, []);
@@ -109,6 +110,50 @@ export function useSequencerEngine(audioBus: AudioBus) {
   const removeTrack = useCallback((trackId: string) => {
     setProject((prev) => (prev.tracks.length > 1 ? { ...prev, tracks: prev.tracks.filter((t) => t.id !== trackId) } : prev));
   }, []);
+
+  const mapTrackSteps = useCallback((trackId: string, mapSteps: (track: SeqTrack) => SeqTrack['steps']) => {
+    setProject((prev) => ({
+      ...prev,
+      tracks: prev.tracks.map((t) => (t.id === trackId ? { ...t, steps: mapSteps(t) } : t)),
+    }));
+  }, []);
+
+  const setNoteAtStep = useCallback(
+    (trackId: string, stepIndex: number, note: number) => {
+      mapTrackSteps(trackId, (t) => drawMelodicStep(t.steps, stepIndex, note));
+    },
+    [mapTrackSteps],
+  );
+
+  const setNoteLength = useCallback(
+    (trackId: string, headIndex: number, targetIndex: number) => {
+      mapTrackSteps(trackId, (t) => setMelodicNoteLength(t.steps, t.lengthSteps, headIndex, targetIndex));
+    },
+    [mapTrackSteps],
+  );
+
+  const setNoteAccent = useCallback(
+    (trackId: string, stepIndex: number, isAccent: boolean) => {
+      mapTrackSteps(trackId, (t) => setMelodicAccent(t.steps, stepIndex, isAccent));
+    },
+    [mapTrackSteps],
+  );
+
+  const setRootNote = useCallback((newRootNote: number) => {
+    setProject((prev) => transposeProject(prev, newRootNote));
+  }, []);
+
+  const setScale = useCallback((newScale: ScaleId) => {
+    setProject((prev) => applyScaleToProject(prev, newScale));
+  }, []);
+
+  const previewNote = useCallback(
+    (trackId: string, note: number, velocity: number) => {
+      const duration = seqStepIntervalSeconds(project.bpm, project.stepsPerBeat) * PREVIEW_DURATION_RATIO;
+      engine.previewNote(trackId, note, velocity, duration);
+    },
+    [engine, project.bpm, project.stepsPerBeat],
+  );
 
   const restoreDefaults = useCallback(() => {
     engine.reset();
@@ -155,6 +200,12 @@ export function useSequencerEngine(audioBus: AudioBus) {
     updateTrack,
     addTrack,
     removeTrack,
+    setNoteAtStep,
+    setNoteLength,
+    setNoteAccent,
+    setRootNote,
+    setScale,
+    previewNote,
     restoreDefaults,
     namedPatternNames,
     saveCurrentAsNamedPattern,

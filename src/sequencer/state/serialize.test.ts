@@ -39,6 +39,24 @@ describe('serializeSeqState / parseSeqState', () => {
     expect(roundTripped!.project).toEqual(project);
   });
 
+  it('round-trips a melodic track exactly, including notes, lengths, and accents', () => {
+    const melodic = buildTrack('m', { name: 'Basso', kind: 'melodic', voiceId: 'bass' });
+    melodic.steps[0] = { velocity: 1, note: 45, length: 4 }; // accented, 4-step note
+    melodic.steps[1] = { velocity: 0 };
+    melodic.steps[2] = { velocity: 0 };
+    melodic.steps[3] = { velocity: 0 };
+    melodic.steps[8] = { velocity: 0.8, note: 52, length: 1 };
+    const project = buildProject([melodic], { rootNote: 9, scale: 'minorPentatonic' });
+
+    const roundTripped = parseSeqState(JSON.stringify(serializeSeqState(project)));
+
+    expect(roundTripped).not.toBeNull();
+    expect(roundTripped!.project).toEqual(project);
+    expect(roundTripped!.project.tracks[0].kind).toBe('melodic');
+    expect(roundTripped!.project.tracks[0].steps[0]).toEqual({ velocity: 1, note: 45, length: 4 });
+    expect(roundTripped!.project.tracks[0].steps[8]).toEqual({ velocity: 0.8, note: 52, length: 1 });
+  });
+
   it('returns null for invalid JSON', () => {
     expect(parseSeqState('not json')).toBeNull();
   });

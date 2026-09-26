@@ -1,16 +1,36 @@
+import type { ScaleId } from '../types';
+import { PITCH_CLASS_NAMES, SCALE_LABELS } from '../scale';
+
 const PATTERN_LENGTH_OPTIONS = [8, 16, 32];
+const SCALE_OPTIONS = Object.keys(SCALE_LABELS) as ScaleId[];
 
 interface Props {
   isPlaying: boolean;
   bpm: number;
   bpmRange: { min: number; max: number };
   patternSteps: number;
+  rootNote: number;
+  scale: ScaleId;
   onToggle: () => void;
   onBpmChange: (bpm: number) => void;
   onPatternStepsChange: (steps: number) => void;
+  onRootNoteChange: (rootNote: number) => void;
+  onScaleChange: (scale: ScaleId) => void;
 }
 
-export function SequencerTransport({ isPlaying, bpm, bpmRange, patternSteps, onToggle, onBpmChange, onPatternStepsChange }: Props) {
+export function SequencerTransport({
+  isPlaying,
+  bpm,
+  bpmRange,
+  patternSteps,
+  rootNote,
+  scale,
+  onToggle,
+  onBpmChange,
+  onPatternStepsChange,
+  onRootNoteChange,
+  onScaleChange,
+}: Props) {
   return (
     <div className="transport-bar">
       <div className="transport-buttons">
@@ -62,6 +82,28 @@ export function SequencerTransport({ isPlaying, bpm, bpmRange, patternSteps, onT
           ))}
         </div>
       </div>
+
+      <label className="layer-field">
+        <span>Sävellaji</span>
+        <select value={rootNote} onChange={(e) => onRootNoteChange(Number(e.target.value))}>
+          {PITCH_CLASS_NAMES.map((name, i) => (
+            <option key={name} value={i}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="layer-field">
+        <span>Asteikko</span>
+        <select value={scale} onChange={(e) => onScaleChange(e.target.value as ScaleId)}>
+          {SCALE_OPTIONS.map((id) => (
+            <option key={id} value={id}>
+              {SCALE_LABELS[id]}
+            </option>
+          ))}
+        </select>
+      </label>
     </div>
   );
 }
