@@ -596,12 +596,16 @@ input[type='range'] {
   align-items: stretch;
   padding: 4px;
   gap: 4px;
+  /* Also a flex item in its own right: StepGrid's .seq-row stacks it
+     below a column-direction header (where this is a no-op, width comes
+     from stretch instead), but PianoRoll's .proll-row places it beside
+     the row-direction pitch-name label, where it must claim the rest of
+     the row's width itself or its children's flex-grow has nothing to
+     distribute -- without this every cell collapsed to a sliver. */
+  flex: 1 1 0;
   min-width: 0;
 }
 
-/* Scoped to .seq-row-cells (StepGrid's fluid, page-sized grid) so this
-   doesn't also resize PianoRoll's cells, which still use a fixed pixel
-   width in a horizontally-scrolling row until Commit 4. */
 .seq-row-cells > .seq-cell,
 .seq-row-cells > .seq-cell-melodic-head,
 .seq-row-cells > .seq-cell-continuation {
