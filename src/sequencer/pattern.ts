@@ -45,3 +45,12 @@ export function clearAllSteps(project: SeqProject): SeqProject {
     tracks: project.tracks.map((t) => ({ ...t, steps: defaultSeqSteps() })),
   };
 }
+
+/** "Tyhjennä raita": clears just one track's steps, keeping its voice,
+ * name, and every other setting untouched. */
+export function clearTrackSteps(project: SeqProject, trackId: string): SeqProject {
+  return {
+    ...project,
+    tracks: project.tracks.map((t) => (t.id === trackId ? { ...t, steps: defaultSeqSteps() } : t)),
+  };
+}

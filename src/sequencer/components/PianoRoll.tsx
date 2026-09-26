@@ -31,7 +31,7 @@ export function PianoRoll({ engine, track, rootNote, scale, onDraw, onSetLength,
   const [baseOctave, setBaseOctave] = useState(() => defaultBaseOctaveForTrack(track));
   const [selectedHeadIndex, setSelectedHeadIndex] = useState<number | null>(null);
 
-  const playheadTargets = useStepPlayheadX(engine, track.lengthSteps);
+  const playheadTargets = useStepPlayheadX(engine, track.lengthSteps, 0, track.lengthSteps);
 
   const intervals = [...SCALES[scale]].sort((a, b) => b - a); // descending, for top-to-bottom rows
   const rowNotes: number[] = [];
@@ -163,7 +163,6 @@ function PianoRollRow({ note, track, visibleSteps, rowWidth, onCellClick, playhe
               playheadTargets.current.delete(el);
             };
           }}
-          style={{ width: CELL_WIDTH_PX }}
         />
       </div>
     </div>

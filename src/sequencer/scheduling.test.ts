@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { seqStepIntervalSeconds, trackStepIndex, voiceDurationSeconds } from './scheduling';
+import { currentStepIndex, seqStepIntervalSeconds, trackStepIndex, voiceDurationSeconds } from './scheduling';
 
 describe('seqStepIntervalSeconds', () => {
   it('computes seconds per 16th note at 120 bpm', () => {
@@ -47,5 +47,23 @@ describe('voiceDurationSeconds', () => {
 
   it('scales with an explicit stepLength', () => {
     expect(voiceDurationSeconds(4, 0.1)).toBeCloseTo(4 * 0.1 * 0.9, 10);
+  });
+});
+
+describe('currentStepIndex', () => {
+  it('is 0 right at baseStartTime', () => {
+    expect(currentStepIndex(10, 0.5, 10, 16)).toBe(0);
+  });
+
+  it('advances one step per stepDuration elapsed', () => {
+    expect(currentStepIndex(10, 0.5, 10 + 0.5 * 3, 16)).toBe(3);
+  });
+
+  it('wraps around patternSteps', () => {
+    expect(currentStepIndex(0, 1, 17, 16)).toBe(1);
+  });
+
+  it('never returns a negative index for a time before baseStartTime', () => {
+    expect(currentStepIndex(10, 1, 8, 16)).toBeGreaterThanOrEqual(0);
   });
 });

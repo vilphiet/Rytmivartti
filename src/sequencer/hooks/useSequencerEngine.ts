@@ -3,12 +3,13 @@ import { SequencerEngine } from '../SequencerEngine';
 import type { AudioBus } from '../../audio/shared/AudioBus';
 import { useUndoableState } from './useUndoableState';
 import type { ScaleId, SeqProject, SeqTrack, SeqTrackKind } from '../types';
-import { clearAllSteps, cycleSeqStepVelocity, setPatternLength } from '../pattern';
-import { buildDefaultProject, buildDrumTrack, buildMelodicTrack } from '../defaultProject';
+import { clearAllSteps, clearTrackSteps, cycleSeqStepVelocity, setPatternLength } from '../pattern';
+import { buildDefaultProject, buildDrumTrack, buildMelodicTrack, makeTrackId } from '../defaultProject';
 import { drawMelodicStep, setMelodicAccent, setMelodicNoteLength } from '../melody';
 import { applyScaleToProject, transposeProject } from '../scale';
 import { seqStepIntervalSeconds } from '../scheduling';
 import { defaultSeqSteps } from '../pattern';
+import { defaultTrackNameForVoice, duplicateTrack } from '../trackActions';
 import { serializeSeqState } from '../state/serialize';
 import {
   deleteSeqNamedPattern,
@@ -100,23 +101,40 @@ export function useSequencerEngine(audioBus: AudioBus) {
   const updateTrack = useCallback((trackId: string, patch: Partial<SeqTrack>) => {
     setProject((prev) => ({
       ...prev,
-      tracks: prev.tracks.map((t) => (t.id === trackId ? { ...t, ...patch } : t)),
+      tracks: prev.tracks.map((t) => {
+        if (t.id !== trackId) return t;
+        // Auto-renaming: if the voice is changing and the track still has
+        // its old voice's default name (i.e. the user hasn't renamed it
+        // themselves), and the patch itself isn't setting an explicit new
+        // name, update the name to match the new voice's default too.
+        if (patch.voiceId && patch.voiceId !== t.voiceId && patch.name === undefined && t.name === defaultTrackNameForVoice(t.voiceId)) {
+          return { ...t, ...patch, name: defaultTrackNameForVoice(patch.voiceId) };
+        }
+        return { ...t, ...patch };
+      }),
     }));
   }, [setProject]);
 
   const addTrack = useCallback((kind: SeqTrackKind) => {
     setProject((prev) => {
-      const name = `Raita ${prev.tracks.length + 1}`;
       const newTrack: SeqTrack =
         kind === 'melodic'
-          ? buildMelodicTrack(name, prev.patternSteps)
-          : buildDrumTrack(name, 'kick', defaultSeqSteps(), prev.patternSteps);
+          ? buildMelodicTrack(defaultTrackNameForVoice('bass'), prev.patternSteps)
+          : buildDrumTrack(defaultTrackNameForVoice('kick'), 'kick', defaultSeqSteps(), prev.patternSteps);
       return { ...prev, tracks: [...prev.tracks, newTrack] };
     });
   }, [setProject]);
 
   const removeTrack = useCallback((trackId: string) => {
     setProject((prev) => (prev.tracks.length > 1 ? { ...prev, tracks: prev.tracks.filter((t) => t.id !== trackId) } : prev));
+  }, [setProject]);
+
+  const clearTrack = useCallback((trackId: string) => {
+    setProject((prev) => clearTrackSteps(prev, trackId));
+  }, [setProject]);
+
+  const duplicateTrackAction = useCallback((trackId: string) => {
+    setProject((prev) => duplicateTrack(prev, trackId, makeTrackId()));
   }, [setProject]);
 
   const mapTrackSteps = useCallback((trackId: string, mapSteps: (track: SeqTrack) => SeqTrack['steps']) => {
@@ -212,6 +230,8 @@ export function useSequencerEngine(audioBus: AudioBus) {
     updateTrack,
     addTrack,
     removeTrack,
+    clearTrack,
+    duplicateTrackAction,
     setNoteAtStep,
     setNoteLength,
     setNoteAccent,

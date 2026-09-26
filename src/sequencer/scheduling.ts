@@ -19,3 +19,13 @@ export function trackStepIndex(globalIndex: number, lengthSteps: number): number
 export function voiceDurationSeconds(stepLength: number | undefined, stepDuration: number): number {
   return (stepLength ?? 1) * stepDuration * 0.9;
 }
+
+/** The step index a playhead/page-follow display should highlight right
+ * now, derived the same way the engine derives its own scheduling
+ * position (never accumulated) — shared by useStepPlayheadX and
+ * useFollowPlaybackPage so they can't disagree about "the current step". */
+export function currentStepIndex(baseStartTime: number, stepDuration: number, referenceTime: number, patternSteps: number): number {
+  const steps = Math.max(1, patternSteps);
+  const elapsedSteps = (referenceTime - baseStartTime) / stepDuration;
+  return ((Math.floor(elapsedSteps) % steps) + steps) % steps;
+}

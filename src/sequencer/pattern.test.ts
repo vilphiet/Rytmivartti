@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { clearAllSteps, cycleSeqStepVelocity, defaultSeqSteps, seqStepVisualState, setPatternLength, SEQ_STEP_ACCENT, SEQ_STEP_NORMAL, SEQ_STEP_OFF } from './pattern';
+import { clearAllSteps, clearTrackSteps, cycleSeqStepVelocity, defaultSeqSteps, seqStepVisualState, setPatternLength, SEQ_STEP_ACCENT, SEQ_STEP_NORMAL, SEQ_STEP_OFF } from './pattern';
 import { MAX_PATTERN_STEPS } from './types';
 import type { SeqProject, SeqTrack } from './types';
 
-function buildTrack(id: string): SeqTrack {
+function buildTrack(id: string, overrides: Partial<SeqTrack> = {}): SeqTrack {
   return {
     id,
     name: id,
@@ -15,6 +15,7 @@ function buildTrack(id: string): SeqTrack {
     solo: false,
     lengthSteps: 16,
     steps: defaultSeqSteps(),
+    ...overrides,
   };
 }
 
@@ -94,5 +95,27 @@ describe('clearAllSteps', () => {
     melodic.steps[3] = { velocity: SEQ_STEP_NORMAL, note: 60, length: 2 };
     const cleared = clearAllSteps(buildProject([melodic]));
     expect(cleared.tracks[0].steps.every((s) => s.velocity === SEQ_STEP_OFF && s.note === undefined)).toBe(true);
+  });
+});
+
+describe('clearTrackSteps', () => {
+  it('clears only the given track, leaving others untouched', () => {
+    const a = buildTrack('a');
+    a.steps[0] = { velocity: SEQ_STEP_ACCENT };
+    const b = buildTrack('b');
+    b.steps[1] = { velocity: SEQ_STEP_NORMAL };
+    const project = buildProject([a, b]);
+
+    const result = clearTrackSteps(project, 'a');
+
+    expect(result.tracks[0].steps.every((s) => s.velocity === SEQ_STEP_OFF)).toBe(true);
+    expect(result.tracks[1].steps[1].velocity).toBe(SEQ_STEP_NORMAL);
+  });
+
+  it('preserves the track\'s name/voice/other settings', () => {
+    const a = buildTrack('a', { name: 'Kick', voiceId: 'snare' });
+    const result = clearTrackSteps(buildProject([a]), 'a');
+    expect(result.tracks[0].name).toBe('Kick');
+    expect(result.tracks[0].voiceId).toBe('snare');
   });
 });

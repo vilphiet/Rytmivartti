@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { MelodicVoiceId, VoiceId } from '../../audio/types';
 import { SYNTH_PRESETS } from '../../audio/voices/synthPresets';
 import type { SeqTrack } from '../types';
@@ -20,10 +21,20 @@ interface Props {
   onUpdate: (patch: Partial<SeqTrack>) => void;
   onRemove: () => void;
   onClose: () => void;
+  autoFocusName?: boolean;
 }
 
-export function TrackSettingsPanel({ track, canRemove, onUpdate, onRemove, onClose }: Props) {
+export function TrackSettingsPanel({ track, canRemove, onUpdate, onRemove, onClose, autoFocusName }: Props) {
   const voiceOptions = track.kind === 'melodic' ? MELODIC_VOICE_OPTIONS : DRUM_VOICE_OPTIONS;
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (autoFocusName) {
+      nameInputRef.current?.focus();
+      nameInputRef.current?.select();
+    }
+  }, [autoFocusName]);
+
   return (
     <div className="seq-track-settings">
       <div className="seq-track-settings-header">
@@ -32,6 +43,16 @@ export function TrackSettingsPanel({ track, canRemove, onUpdate, onRemove, onClo
           Sulje
         </button>
       </div>
+
+      <label className="layer-field">
+        <span>Nimi</span>
+        <input
+          ref={nameInputRef}
+          type="text"
+          value={track.name}
+          onChange={(e) => onUpdate({ name: e.target.value })}
+        />
+      </label>
 
       <label className="layer-field">
         <span>Ääni</span>

@@ -31,6 +31,8 @@ export function SequencerTab({ audioBus }: Props) {
     updateTrack,
     addTrack,
     removeTrack,
+    clearTrack,
+    duplicateTrackAction,
     setNoteAtStep,
     setNoteLength,
     setNoteAccent,
@@ -50,6 +52,7 @@ export function SequencerTab({ audioBus }: Props) {
   } = useSequencerEngine(audioBus);
 
   const [openTrackId, setOpenTrackId] = useState<string | null>(null);
+  const [autoFocusName, setAutoFocusName] = useState(false);
   const [pianoRollTrackId, setPianoRollTrackId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const openTrack = project.tracks.find((t) => t.id === openTrackId) ?? null;
@@ -83,7 +86,14 @@ export function SequencerTab({ audioBus }: Props) {
           engine={engine}
           project={project}
           onToggleStep={toggleStep}
-          onOpenTrackSettings={(id) => setOpenTrackId((prev) => (prev === id ? null : id))}
+          onOpenTrackSettings={(id) => {
+            setAutoFocusName(false);
+            setOpenTrackId((prev) => (prev === id ? null : id));
+          }}
+          onRenameTrack={(id) => {
+            setAutoFocusName(true);
+            setOpenTrackId(id);
+          }}
           onOpenPianoRoll={(id) => setPianoRollTrackId((prev) => (prev === id ? null : id))}
           onToggleMute={(id) => {
             const track = project.tracks.find((t) => t.id === id);
@@ -92,6 +102,12 @@ export function SequencerTab({ audioBus }: Props) {
           onToggleSolo={(id) => {
             const track = project.tracks.find((t) => t.id === id);
             if (track) updateTrack(id, { solo: !track.solo });
+          }}
+          onClearTrack={clearTrack}
+          onDuplicateTrack={duplicateTrackAction}
+          onRemoveTrack={(id) => {
+            removeTrack(id);
+            setOpenTrackId((prev) => (prev === id ? null : prev));
           }}
         />
 
@@ -113,6 +129,7 @@ export function SequencerTab({ audioBus }: Props) {
           <TrackSettingsPanel
             track={openTrack}
             canRemove={project.tracks.length > 1}
+            autoFocusName={autoFocusName}
             onUpdate={(patch) => updateTrack(openTrack.id, patch)}
             onRemove={() => {
               removeTrack(openTrack.id);
